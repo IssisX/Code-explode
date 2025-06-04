@@ -1,0 +1,2680 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Advanced Gravitational Collision Simulator</title>
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Arial', sans-serif;
+            background: linear-gradient(135deg, #0a0a0a, #1a1a2e, #16213e);
+            color: #ffffff;
+            overflow-x: hidden; /* Changed from overflow: hidden */
+            height: 100vh;
+        }
+
+        .simulator-container {
+            display: flex;
+            height: 100vh;
+            background: radial-gradient(ellipse at center, #0f0f23, #1a1a2e, #16213e);
+        }
+
+        .main-simulation {
+            flex: 1;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            padding: 20px;
+            background: linear-gradient(135deg, #0c0c0c 0%, #1a1a1a 50%, #2d2d2d 100%);
+        }
+
+        .simulation-canvas {
+            border: 3px solid #4a90e2;
+            border-radius: 15px;
+            background: radial-gradient(ellipse at center, #000000, #0a0a0a, #1a1a1a);
+            box-shadow:
+                0 0 40px rgba(74, 144, 226, 0.4),
+                inset 0 0 60px rgba(0, 0, 0, 0.8),
+                0 0 100px rgba(74, 144, 226, 0.2);
+            cursor: crosshair;
+            transition: all 0.3s ease;
+            width: 100%; /* Added */
+            height: auto; /* Added */
+            aspect-ratio: 800 / 600; /* Added */
+            max-width: 800px; /* Added */
+        }
+
+        .simulation-canvas:hover {
+            box-shadow:
+                0 0 60px rgba(74, 144, 226, 0.6),
+                inset 0 0 80px rgba(0, 0, 0, 0.9),
+                0 0 120px rgba(74, 144, 226, 0.3);
+        }
+
+        .control-panel {
+            width: 380px;
+            padding: 25px;
+            background: linear-gradient(180deg, #2c3e50 0%, #34495e 50%, #2c3e50 100%);
+            border-left: 4px solid #4a90e2;
+            overflow-y: auto;
+            max-height: 100vh;
+            box-shadow: inset 5px 0 15px rgba(0, 0, 0, 0.3);
+        }
+
+        .control-section {
+            margin-bottom: 25px; /* Standardized margin */
+            padding: 20px;
+            background: linear-gradient(145deg, #3c4043, #282c34);
+            border-radius: 12px;
+            border: 2px solid #4a90e2;
+            box-shadow:
+                0 6px 12px rgba(0, 0, 0, 0.4),
+                inset 0 1px 3px rgba(255, 255, 255, 0.1);
+            transition: all 0.3s ease;
+        }
+
+        .control-section:hover {
+            transform: translateY(-2px);
+            box-shadow:
+                0 8px 16px rgba(0, 0, 0, 0.5),
+                inset 0 1px 3px rgba(255, 255, 255, 0.15);
+        }
+
+        .section-title {
+            font-size: 18px;
+            font-weight: bold;
+            margin-bottom: 20px; /* Standardized margin */
+            color: #4a90e2;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            border-bottom: 3px solid #4a90e2;
+            padding-bottom: 8px;
+            text-shadow: 0 0 10px rgba(74, 144, 226, 0.5);
+        }
+
+        .input-group {
+            margin-bottom: 15px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .input-label {
+            font-size: 13px;
+            margin-bottom: 6px;
+            color: #b0b0b0;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .input-field {
+            padding: 10px 15px;
+            border-radius: 8px;
+            border: 2px solid #4a90e2;
+            background: linear-gradient(145deg, #1e1e1e, #2a2a2a);
+            color: #ffffff;
+            font-size: 14px;
+            transition: all 0.3s ease;
+            box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.3);
+            min-height: 40px; /* Added for touch usability */
+        }
+
+        .input-field:focus {
+            outline: none;
+            border-color: #74b9ff;
+            box-shadow:
+                inset 0 2px 4px rgba(0, 0, 0, 0.3),
+                0 0 15px rgba(116, 185, 255, 0.5);
+            background: linear-gradient(145deg, #2a2a2a, #3a3a3a);
+        }
+
+        .control-button {
+            padding: 12px 18px;
+            margin: 5px; /* Standardized margin */
+            border-radius: 10px;
+            border: none;
+            background: linear-gradient(145deg, #4a90e2, #357abd);
+            color: white;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: bold;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            box-shadow:
+                0 4px 8px rgba(0, 0, 0, 0.3),
+                inset 0 1px 2px rgba(255, 255, 255, 0.2);
+            min-height: 40px; /* Added for touch usability */
+        }
+
+        .control-button:hover {
+            transform: translateY(-2px);
+            box-shadow:
+                0 6px 12px rgba(0, 0, 0, 0.4),
+                inset 0 1px 2px rgba(255, 255, 255, 0.3);
+            background: linear-gradient(145deg, #5aa0f2, #4080cd);
+        }
+
+        .control-button:active {
+            transform: translateY(0);
+            box-shadow:
+                0 2px 4px rgba(0, 0, 0, 0.3),
+                inset 0 1px 2px rgba(255, 255, 255, 0.1);
+        }
+
+        .button-danger {
+            background: linear-gradient(145deg, #e74c3c, #c0392b);
+        }
+
+        .button-danger:hover {
+            background: linear-gradient(145deg, #f75c4c, #d0493b);
+        }
+
+        .button-success {
+            background: linear-gradient(145deg, #27ae60, #229954);
+        }
+
+        .button-success:hover {
+            background: linear-gradient(145deg, #37be70, #329964);
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin-top: 15px;
+        }
+
+        .stat-box {
+            padding: 12px;
+            background: linear-gradient(145deg, #1a1a1a, #2d2d2d);
+            border-radius: 8px;
+            border: 2px solid #4a90e2;
+            text-align: center;
+            box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.3);
+        }
+
+        .stat-label {
+            font-size: 11px;
+            color: #b0b0b0;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 4px;
+        }
+
+        .stat-value {
+            font-size: 16px;
+            font-weight: bold;
+            color: #4a90e2;
+            text-shadow: 0 0 8px rgba(74, 144, 226, 0.5);
+        }
+
+        .preset-button {
+            padding: 10px 15px;
+            margin: 5px; /* Standardized margin */
+            border-radius: 8px;
+            border: 2px solid #4a90e2;
+            background: linear-gradient(145deg, #2c3e50, #34495e);
+            color: white;
+            cursor: pointer;
+            font-size: 13px;
+            transition: all 0.3s ease;
+            text-transform: capitalize;
+            min-height: 40px; /* Added for touch usability */
+        }
+
+        .preset-button:hover {
+            background: linear-gradient(145deg, #3c4e60, #44596e);
+            transform: translateY(-1px);
+        }
+
+        .preset-button.active {
+            background: linear-gradient(145deg, #4a90e2, #357abd);
+            box-shadow: 0 0 15px rgba(74, 144, 226, 0.5);
+        }
+
+        .collision-log {
+            max-height: 180px;
+            overflow-y: auto;
+            background: linear-gradient(145deg, #0f0f0f, #1a1a1a);
+            border-radius: 8px;
+            padding: 12px;
+            border: 2px solid #4a90e2;
+            box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.5);
+        }
+
+        .log-entry {
+            font-size: 12px;
+            padding: 6px 0;
+            border-bottom: 1px solid #333;
+            color: #e0e0e0;
+            line-height: 1.4;
+        }
+
+        .log-entry:last-child {
+            border-bottom: none;
+        }
+
+        .energy-overlay {
+            position: absolute;
+            top: 30px;
+            left: 30px;
+            background: rgba(0, 0, 0, 0.85);
+            padding: 20px;
+            border-radius: 12px;
+            border: 2px solid #4a90e2;
+            box-shadow:
+                0 8px 16px rgba(0, 0, 0, 0.5),
+                inset 0 1px 3px rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+        }
+
+        .energy-title {
+            font-size: 14px;
+            color: #4a90e2;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 10px;
+            text-shadow: 0 0 8px rgba(74, 144, 226, 0.5);
+        }
+
+        .energy-value {
+            font-size: 13px;
+            margin: 4px 0;
+            color: #ffffff;
+        }
+
+        .checkbox-container {
+            display: flex;
+            align-items: center;
+            margin: 8px 0;
+        }
+
+        .checkbox-container input[type="checkbox"] {
+            margin-right: 8px;
+            transform: scale(1.2);
+        }
+
+        .advanced-toggle {
+            cursor: pointer;
+            user-select: none;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .toggle-icon {
+            font-size: 14px;
+            transition: transform 0.3s ease;
+        }
+
+        .toggle-icon.expanded {
+            transform: rotate(90deg);
+        }
+
+        .material-select {
+            background: linear-gradient(145deg, #1e1e1e, #2a2a2a);
+            border: 2px solid #4a90e2;
+            color: #ffffff;
+            padding: 10px 15px;
+            border-radius: 8px;
+            font-size: 14px;
+            cursor: pointer;
+            min-height: 40px; /* Added for touch usability */
+        }
+
+        .material-select option {
+            background: #2a2a2a;
+            color: #ffffff;
+        }
+
+        .creation-hint {
+            font-size: 11px;
+            color: #74b9ff;
+            margin-top: 12px;
+            font-style: italic;
+            text-align: center;
+            background: rgba(116, 185, 255, 0.1);
+            padding: 8px;
+            border-radius: 6px;
+            border: 1px solid rgba(116, 185, 255, 0.3);
+        }
+
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: #1a1a1a;
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: linear-gradient(180deg, #4a90e2, #357abd);
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: linear-gradient(180deg, #5aa0f2, #4080cd);
+        }
+
+        @media (max-width: 768px) {
+            .simulator-container {
+                flex-direction: column;
+            }
+
+            .control-panel {
+                width: 100%;
+                max-height: 40vh;
+                border-left: none;
+                border-top: 4px solid #4a90e2;
+            }
+
+            .input-field,
+            .control-button,
+            .preset-button,
+            .material-select {
+                font-size: 13px;
+            }
+
+            .section-title {
+                font-size: 16px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef, useCallback, createContext, useContext, useReducer } = React;
+
+        // =====================================================
+        // ADVANCED PHYSICS CONSTANTS AND UTILITIES
+        // =====================================================
+
+        const PhysicsConstants = {
+            G: 6.674e-11,
+            MIN_DISTANCE: 1e-10,
+            MAX_VELOCITY: 1e6,
+            COLLISION_DAMPING: 0.8,
+            FRAGMENT_VELOCITY_MULTIPLIER: 1.2,
+            DENSITY_ROCK: 2700,
+            DENSITY_ICE: 917,
+            DENSITY_METAL: 7800,
+            DENSITY_CARBONACEOUS: 1300,
+            ESCAPE_VELOCITY_FACTOR: 1.15,
+            STRESS_THRESHOLD_ROCK: 1e8,
+            STRESS_THRESHOLD_ICE: 5e6,
+            STRESS_THRESHOLD_METAL: 5e8,
+            MELTING_POINT_ROCK: 1200,
+            MELTING_POINT_ICE: 273,
+            MELTING_POINT_METAL: 1500,
+            SPECIFIC_HEAT_ROCK: 800,
+            SPECIFIC_HEAT_ICE: 2100,
+            SPECIFIC_HEAT_METAL: 500
+        };
+
+        const MaterialProperties = {
+            rock: {
+                density: PhysicsConstants.DENSITY_ROCK,
+                strength: PhysicsConstants.STRESS_THRESHOLD_ROCK,
+                meltingPoint: PhysicsConstants.MELTING_POINT_ROCK,
+                specificHeat: PhysicsConstants.SPECIFIC_HEAT_ROCK,
+                color: { r: 139, g: 69, b: 19 },
+                fragmentationFactor: 1.0,
+                cohesion: 0.8
+            },
+            ice: {
+                density: PhysicsConstants.DENSITY_ICE,
+                strength: PhysicsConstants.STRESS_THRESHOLD_ICE,
+                meltingPoint: PhysicsConstants.MELTING_POINT_ICE,
+                specificHeat: PhysicsConstants.SPECIFIC_HEAT_ICE,
+                color: { r: 150, g: 220, b: 255 },
+                fragmentationFactor: 1.5,
+                cohesion: 0.4
+            },
+            metal: {
+                density: PhysicsConstants.DENSITY_METAL,
+                strength: PhysicsConstants.STRESS_THRESHOLD_METAL,
+                meltingPoint: PhysicsConstants.MELTING_POINT_METAL,
+                specificHeat: PhysicsConstants.SPECIFIC_HEAT_METAL,
+                color: { r: 180, g: 140, b: 100 },
+                fragmentationFactor: 0.7,
+                cohesion: 1.2
+            },
+            carbonaceous: {
+                density: PhysicsConstants.DENSITY_CARBONACEOUS,
+                strength: PhysicsConstants.STRESS_THRESHOLD_ROCK * 0.3,
+                meltingPoint: PhysicsConstants.MELTING_POINT_ROCK * 0.8,
+                specificHeat: PhysicsConstants.SPECIFIC_HEAT_ROCK * 1.2,
+                color: { r: 80, g: 60, b: 40 },
+                fragmentationFactor: 2.0,
+                cohesion: 0.3
+            }
+        };
+
+        // =====================================================
+        // ADVANCED PROCEDURAL FRAGMENTATION ENGINE
+        // =====================================================
+
+        class ProceduralFragmentationEngine {
+            static generateVoronoiSeeds(numSeeds, bounds) {
+                const seeds = [];
+                for (let i = 0; i < numSeeds; i++) {
+                    seeds.push({
+                        x: bounds.minX + Math.random() * (bounds.maxX - bounds.minX),
+                        y: bounds.minY + Math.random() * (bounds.maxY - bounds.minY),
+                        strength: 0.5 + Math.random() * 0.5
+                    });
+                }
+                return seeds;
+            }
+
+            static calculateStressPropagation(impactPoint, objectRadius, material, impactEnergy) {
+                const stressWaves = [];
+                const waveSpeed = Math.sqrt(material.strength / material.density);
+                const maxWaves = 8;
+
+                for (let i = 0; i < maxWaves; i++) {
+                    const waveRadius = (i + 1) * objectRadius * 0.2;
+                    const waveStrength = impactEnergy / (4 * Math.PI * waveRadius * waveRadius);
+                    const dampingFactor = Math.exp(-i * 0.3);
+
+                    stressWaves.push({
+                        radius: waveRadius,
+                        strength: waveStrength * dampingFactor,
+                        propagationTime: waveRadius / waveSpeed
+                    });
+                }
+
+                return stressWaves;
+            }
+
+            static generateFractureLines(impactPoint, objectRadius, material, stressWaves) {
+                const fractureLines = [];
+                const numPrimaryFractures = Math.floor(4 + Math.random() * 6);
+
+                // Primary radial fractures from impact point
+                for (let i = 0; i < numPrimaryFractures; i++) {
+                    const angle = (2 * Math.PI * i) / numPrimaryFractures + (Math.random() - 0.5) * 0.5;
+                    const length = objectRadius * (0.3 + Math.random() * 0.7);
+                    const jaggedness = material.cohesion * 0.1;
+
+                    const fracture = this.generateJaggedLine(
+                        impactPoint.x, impactPoint.y,
+                        impactPoint.x + Math.cos(angle) * length,
+                        impactPoint.y + Math.sin(angle) * length,
+                        jaggedness, 5
+                    );
+
+                    fractureLines.push({
+                        points: fracture,
+                        type: 'primary',
+                        strength: 0.8 + Math.random() * 0.2
+                    });
+                }
+
+                // Secondary concentric fractures
+                stressWaves.forEach((wave, index) => {
+                    if (wave.strength > material.strength * 0.1) {
+                        const numConcentric = Math.floor(wave.strength / material.strength * 6);
+
+                        for (let i = 0; i < numConcentric; i++) {
+                            const startAngle = Math.random() * 2 * Math.PI;
+                            const arcLength = Math.PI * 0.3 + Math.random() * Math.PI * 0.4;
+                            const radius = wave.radius * (0.8 + Math.random() * 0.4);
+
+                            const concentric = this.generateConcentricFracture(
+                                impactPoint.x, impactPoint.y,
+                                radius, startAngle, arcLength,
+                                material.cohesion * 0.05
+                            );
+
+                            fractureLines.push({
+                                points: concentric,
+                                type: 'concentric',
+                                strength: wave.strength / material.strength
+                            });
+                        }
+                    }
+                });
+
+                return fractureLines;
+            }
+
+            static generateJaggedLine(x1, y1, x2, y2, jaggedness, segments) {
+                const points = [{ x: x1, y: y1 }];
+
+                for (let i = 1; i < segments; i++) {
+                    const t = i / segments;
+                    const baseX = x1 + (x2 - x1) * t;
+                    const baseY = y1 + (y2 - y1) * t;
+
+                    const perpX = -(y2 - y1);
+                    const perpY = x2 - x1;
+                    const perpLength = Math.sqrt(perpX * perpX + perpY * perpY);
+
+                    const offset = (Math.random() - 0.5) * jaggedness * perpLength;
+
+                    points.push({
+                        x: baseX + (perpX / perpLength) * offset,
+                        y: baseY + (perpY / perpLength) * offset
+                    });
+                }
+
+                points.push({ x: x2, y: y2 });
+                return points;
+            }
+
+            static generateConcentricFracture(centerX, centerY, radius, startAngle, arcLength, jaggedness) {
+                const points = [];
+                const numPoints = Math.floor(arcLength * radius * 0.1);
+
+                for (let i = 0; i <= numPoints; i++) {
+                    const angle = startAngle + (arcLength * i) / numPoints;
+                    const radiusVariation = radius * (1 + (Math.random() - 0.5) * jaggedness);
+
+                    points.push({
+                        x: centerX + Math.cos(angle) * radiusVariation,
+                        y: centerY + Math.sin(angle) * radiusVariation
+                    });
+                }
+
+                return points;
+            }
+
+            static createFragmentsFromFractures(target, projectile, fractureLines, impactData) {
+                const fragments = [];
+                const material = MaterialProperties[target.material] || MaterialProperties.rock;
+                const totalMass = target.mass + projectile.mass;
+                const { impactVelocity, impactAngle, kineticEnergy } = impactData;
+
+                // Calculate fragment size distribution using power law
+                const numFragments = Math.min(
+                    Math.floor(10 + fractureLines.length * 2 + (kineticEnergy / 1e15) * 5),
+                    150
+                );
+
+                const fragments_masses = this.generatePowerLawDistribution(totalMass, numFragments, -2.5);
+                const centerOfMass = this.calculateCenterOfMass(target, projectile);
+
+                fragments_masses.forEach((mass, index) => {
+                    const fragment = this.createDetailedFragment(
+                        target, projectile, mass, index, numFragments,
+                        impactVelocity, centerOfMass, impactAngle,
+                        material, fractureLines, kineticEnergy
+                    );
+
+                    if (fragment) fragments.push(fragment);
+                });
+
+                // Add specialized fragment types
+                this.addSpallFragments(fragments, target, projectile, impactData, material);
+                this.addMeltDroplets(fragments, target, projectile, impactData, material);
+                this.addVaporCloud(fragments, target, projectile, impactData, material);
+
+                return fragments;
+            }
+
+            static generatePowerLawDistribution(totalMass, numFragments, exponent) {
+                const masses = [];
+                let totalGenerated = 0;
+
+                for (let i = 0; i < numFragments; i++) {
+                    const x = (i + 1) / numFragments;
+                    const mass = Math.pow(x, exponent);
+                    masses.push(mass);
+                    totalGenerated += mass;
+                }
+
+                // Normalize to total mass
+                return masses.map(mass => (mass / totalGenerated) * totalMass * 0.95); // 5% lost to vapor
+            }
+
+            static createDetailedFragment(target, projectile, mass, index, totalFragments,
+                                        impactVelocity, centerOfMass, impactAngle,
+                                        material, fractureLines, kineticEnergy) {
+
+                if (mass < target.mass * 1e-6) return null; // Too small to track
+
+                const density = material.density * (0.7 + Math.random() * 0.6); // Density variation due to porosity
+                const radius = Math.pow(3 * mass / (4 * Math.PI * density), 1/3);
+
+                // Fragment position distribution
+                const distributionRadius = Math.max(target.radius, projectile.radius) * (1.5 + Math.random() * 2);
+                const escapeVelocity = Math.sqrt(2 * PhysicsConstants.G * (target.mass + projectile.mass) /
+                                               (target.radius + projectile.radius));
+
+                // Advanced angular distribution based on impact geometry and stress waves
+                let angle;
+                const preferredDirection = impactAngle + Math.PI;
+                const stressInfluence = this.calculateStressInfluence(index, fractureLines);
+
+                if (mass > target.mass * 0.1) {
+                    // Large fragments follow ballistic trajectories
+                    angle = preferredDirection + (Math.random() - 0.5) * Math.PI * 0.5;
+                } else if (mass > target.mass * 0.01) {
+                    // Medium fragments influenced by stress waves
+                    angle = preferredDirection + stressInfluence * Math.PI + (Math.random() - 0.5) * Math.PI;
+                } else {
+                    // Small fragments more random distribution
+                    angle = Math.random() * 2 * Math.PI;
+                }
+
+                const radialVariation = 0.3 + Math.random() * 1.4;
+                const position = {
+                    x: centerOfMass.x + distributionRadius * radialVariation * Math.cos(angle),
+                    y: centerOfMass.y + distributionRadius * radialVariation * Math.sin(angle)
+                };
+
+                // Fragment velocity calculation with material-specific factors
+                const baseSpeed = PhysicsConstants.ESCAPE_VELOCITY_FACTOR * escapeVelocity;
+                const materialFactor = material.fragmentationFactor;
+                const sizeFactor = Math.pow(mass / target.mass, -0.2); // Smaller fragments faster
+                const stressFactor = 1 + stressInfluence * 0.5;
+
+                const fragmentSpeed = baseSpeed * materialFactor * sizeFactor * stressFactor *
+                                    (0.5 + Math.random() * 1.0);
+
+                const velocity = {
+                    x: centerOfMass.vx + fragmentSpeed * Math.cos(angle),
+                    y: centerOfMass.vy + fragmentSpeed * Math.sin(angle)
+                };
+
+                // Fragment thermal properties
+                const impactHeating = (kineticEnergy / totalFragments) / (mass * material.specificHeat);
+                const temperature = 300 + impactHeating + (Math.random() * 200);
+
+                // Fragment shape characteristics
+                const aspectRatio = 0.3 + Math.random() * 1.4; // Non-spherical fragments
+                const angularVelocity = (Math.random() - 0.5) * 0.5; // Tumbling motion
+
+                return {
+                    id: Date.now() + index + Math.random(),
+                    mass,
+                    radius,
+                    density,
+                    aspectRatio,
+                    material: target.material,
+                    position,
+                    velocity,
+                    acceleration: { x: 0, y: 0 },
+                    angularVelocity,
+                    orientation: Math.random() * 2 * Math.PI,
+                    isFragment: true,
+                    fragmentType: this.classifyFragmentType(mass, target.mass),
+                    age: 0,
+                    temperature,
+                    brightness: 0.5 + Math.random() * 0.5,
+                    porosity: Math.random() * 0.3,
+                    structuralIntegrity: 0.1 + Math.random() * 0.9,
+                    sublimationRate: material.cohesion * 1e-8,
+                    magneticMoment: target.material === 'metal' ? Math.random() * 1e-6 : 0
+                };
+            }
+
+            static calculateStressInfluence(fragmentIndex, fractureLines) {
+                let influence = 0;
+                const position = fragmentIndex / fractureLines.length;
+
+                fractureLines.forEach(fracture => {
+                    if (fracture.type === 'primary') {
+                        influence += fracture.strength * Math.exp(-Math.abs(position - 0.5) * 5);
+                    } else {
+                        influence += fracture.strength * 0.3 * Math.exp(-Math.abs(position - 0.7) * 3);
+                    }
+                });
+
+                return Math.min(influence, 1.0);
+            }
+
+            static classifyFragmentType(fragmentMass, originalMass) {
+                const ratio = fragmentMass / originalMass;
+
+                if (ratio > 0.1) return 'remnant';
+                else if (ratio > 0.01) return 'large';
+                else if (ratio > 0.001) return 'medium';
+                else if (ratio > 0.0001) return 'small';
+                else return 'debris';
+            }
+
+            static addSpallFragments(fragments, target, projectile, impactData, material) {
+                // High-velocity spall fragments from impact shock
+                const numSpall = Math.floor(impactData.kineticEnergy / 1e16);
+
+                for (let i = 0; i < Math.min(numSpall, 20); i++) {
+                    const spallMass = target.mass * (1e-5 + Math.random() * 1e-4);
+                    const spallSpeed = impactData.impactVelocity * (2 + Math.random() * 3);
+                    const angle = impactData.impactAngle + (Math.random() - 0.5) * Math.PI * 0.3;
+
+                    const centerOfMass = this.calculateCenterOfMass(target, projectile);
+
+                    fragments.push({
+                        id: Date.now() + Math.random(),
+                        mass: spallMass,
+                        radius: Math.pow(3 * spallMass / (4 * Math.PI * material.density), 1/3),
+                        density: material.density * 1.2, // Compressed spall
+                        material: target.material,
+                        position: {
+                            x: centerOfMass.x + target.radius * Math.cos(angle),
+                            y: centerOfMass.y + target.radius * Math.sin(angle)
+                        },
+                        velocity: {
+                            x: centerOfMass.vx + spallSpeed * Math.cos(angle),
+                            y: centerOfMass.vy + spallSpeed * Math.sin(angle)
+                        },
+                        acceleration: { x: 0, y: 0 },
+                        isFragment: true,
+                        fragmentType: 'spall',
+                        age: 0,
+                        temperature: 800 + Math.random() * 500,
+                        brightness: 0.8 + Math.random() * 0.2,
+                        aspectRatio: 2 + Math.random() * 3, // Elongated spall
+                        angularVelocity: (Math.random() - 0.5) * 2,
+                        orientation: Math.random() * 2 * Math.PI
+                    });
+                }
+            }
+
+            static addMeltDroplets(fragments, target, projectile, impactData, material) {
+                if (impactData.kineticEnergy < material.strength * target.mass) return;
+
+                const numDroplets = Math.floor(impactData.kineticEnergy / (material.strength * 1e12));
+
+                for (let i = 0; i < Math.min(numDroplets, 30); i++) {
+                    const dropletMass = target.mass * (1e-6 + Math.random() * 1e-5);
+                    const dropletSpeed = impactData.impactVelocity * (0.5 + Math.random() * 1.5);
+                    const angle = Math.random() * 2 * Math.PI;
+
+                    const centerOfMass = this.calculateCenterOfMass(target, projectile);
+
+                    fragments.push({
+                        id: Date.now() + Math.random(),
+                        mass: dropletMass,
+                        radius: Math.pow(3 * dropletMass / (4 * Math.PI * material.density * 0.8), 1/3),
+                        density: material.density * 0.8, // Liquid density
+                        material: target.material,
+                        position: {
+                            x: centerOfMass.x + (Math.random() - 0.5) * target.radius,
+                            y: centerOfMass.y + (Math.random() - 0.5) * target.radius
+                        },
+                        velocity: {
+                            x: centerOfMass.vx + dropletSpeed * Math.cos(angle),
+                            y: centerOfMass.vy + dropletSpeed * Math.sin(angle)
+                        },
+                        acceleration: { x: 0, y: 0 },
+                        isFragment: true,
+                        fragmentType: 'melt',
+                        age: 0,
+                        temperature: material.meltingPoint + Math.random() * 300,
+                        brightness: 1.0,
+                        aspectRatio: 0.8 + Math.random() * 0.4, // Nearly spherical droplets
+                        angularVelocity: (Math.random() - 0.5) * 0.1,
+                        orientation: Math.random() * 2 * Math.PI,
+                        coolingRate: 1e-3
+                    });
+                }
+            }
+
+            static addVaporCloud(fragments, target, projectile, impactData, material) {
+                if (impactData.kineticEnergy < material.strength * target.mass * 10) return;
+
+                const vaporMass = (target.mass + projectile.mass) * 0.05 *
+                                (impactData.kineticEnergy / (material.strength * target.mass * 10));
+
+                const numVaporParticles = Math.min(Math.floor(vaporMass / (target.mass * 1e-8)), 50);
+
+                for (let i = 0; i < numVaporParticles; i++) {
+                    const particleMass = vaporMass / numVaporParticles;
+                    const vaporSpeed = impactData.impactVelocity * (3 + Math.random() * 5);
+                    const angle = Math.random() * 2 * Math.PI;
+
+                    const centerOfMass = this.calculateCenterOfMass(target, projectile);
+
+                    fragments.push({
+                        id: Date.now() + Math.random(),
+                        mass: particleMass,
+                        radius: Math.pow(3 * particleMass / (4 * Math.PI * material.density * 0.001), 1/3),
+                        density: material.density * 0.001, // Vapor density
+                        material: target.material,
+                        position: {
+                            x: centerOfMass.x + (Math.random() - 0.5) * target.radius * 0.5,
+                            y: centerOfMass.y + (Math.random() - 0.5) * target.radius * 0.5
+                        },
+                        velocity: {
+                            x: centerOfMass.vx + vaporSpeed * Math.cos(angle),
+                            y: centerOfMass.vy + vaporSpeed * Math.sin(angle)
+                        },
+                        acceleration: { x: 0, y: 0 },
+                        isFragment: true,
+                        fragmentType: 'vapor',
+                        age: 0,
+                        temperature: material.meltingPoint * 2 + Math.random() * 1000,
+                        brightness: 0.3 + Math.random() * 0.4,
+                        aspectRatio: 0.5 + Math.random() * 1.0,
+                        angularVelocity: (Math.random() - 0.5) * 1.0,
+                        orientation: Math.random() * 2 * Math.PI,
+                        expansionRate: 1e-2,
+                        opacity: 0.3 + Math.random() * 0.4
+                    });
+                }
+            }
+
+            static calculateCenterOfMass(object1, object2) {
+                const totalMass = object1.mass + object2.mass;
+                return {
+                    x: (object1.position.x * object1.mass + object2.position.x * object2.mass) / totalMass,
+                    y: (object1.position.y * object1.mass + object2.position.y * object2.mass) / totalMass,
+                    vx: (object1.velocity.x * object1.mass + object2.velocity.x * object2.mass) / totalMass,
+                    vy: (object1.velocity.y * object1.mass + object2.velocity.y * object2.mass) / totalMass
+                };
+            }
+        }
+
+        // =====================================================
+        // ENHANCED PHYSICS ENGINE
+        // =====================================================
+
+        class AdvancedPhysicsEngine {
+            static calculateGravitationalForce(mass1, mass2, distance) {
+                const safeDist = Math.max(distance, PhysicsConstants.MIN_DISTANCE);
+                return (PhysicsConstants.G * mass1 * mass2) / (safeDist * safeDist);
+            }
+
+            static updateGravitationalAcceleration(object1, object2) {
+                const dx = object2.position.x - object1.position.x;
+                const dy = object2.position.y - object1.position.y;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+
+                if (distance < PhysicsConstants.MIN_DISTANCE) return {
+                    object1: { ax: 0, ay: 0 },
+                    object2: { ax: 0, ay: 0 }
+                };
+
+                const force = this.calculateGravitationalForce(object1.mass, object2.mass, distance);
+                const acceleration1 = force / object1.mass;
+                const acceleration2 = force / object2.mass;
+
+                const unitX = dx / distance;
+                const unitY = dy / distance;
+
+                return {
+                    object1: { ax: acceleration1 * unitX, ay: acceleration1 * unitY },
+                    object2: { ax: -acceleration2 * unitX, ay: -acceleration2 * unitY }
+                };
+            }
+
+            static detectCollision(object1, object2) {
+                const dx = object2.position.x - object1.position.x;
+                const dy = object2.position.y - object1.position.y;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+                const combinedRadius = object1.radius + object2.radius;
+                return distance <= combinedRadius;
+            }
+
+            static calculateDetailedImpactParameters(target, projectile) {
+                const relativeVx = projectile.velocity.x - target.velocity.x;
+                const relativeVy = projectile.velocity.y - target.velocity.y;
+                const relativeSpeed = Math.sqrt(relativeVx * relativeVx + relativeVy * relativeVy);
+
+                const totalRadius = target.radius + projectile.radius;
+                const impactVelocity = Math.sqrt(
+                    relativeSpeed * relativeSpeed +
+                    2 * PhysicsConstants.G * (target.mass + projectile.mass) / totalRadius
+                );
+
+                const dx = projectile.position.x - target.position.x;
+                const dy = projectile.position.y - target.position.y;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+
+                const impactParameter = Math.abs(
+                    (dx * relativeVy - dy * relativeVx) / Math.max(relativeSpeed, PhysicsConstants.MIN_DISTANCE)
+                );
+
+                const impactAngle = Math.atan2(relativeVy, relativeVx);
+                const kineticEnergy = 0.5 * (target.mass + projectile.mass) * relativeSpeed * relativeSpeed;
+
+                // Advanced impact characterization
+                const reducedMass = (target.mass * projectile.mass) / (target.mass + projectile.mass);
+                const specificEnergy = kineticEnergy / (target.mass + projectile.mass);
+                const momentumTransfer = reducedMass * impactVelocity;
+
+                // Impact point calculation
+                const impactPoint = {
+                    x: target.position.x + (dx / distance) * target.radius,
+                    y: target.position.y + (dy / distance) * target.radius
+                };
+
+                return {
+                    impactVelocity,
+                    impactParameter,
+                    relativeSpeed,
+                    impactAngle,
+                    kineticEnergy,
+                    totalMass: target.mass + projectile.mass,
+                    reducedMass,
+                    specificEnergy,
+                    momentumTransfer,
+                    impactPoint
+                };
+            }
+
+            static generateAdvancedFragments(target, projectile, impactData) {
+                const material = MaterialProperties[target.material] || MaterialProperties.rock;
+
+                // Calculate stress propagation
+                const stressWaves = ProceduralFragmentationEngine.calculateStressPropagation(
+                    impactData.impactPoint, target.radius, material, impactData.kineticEnergy
+                );
+
+                // Generate fracture pattern
+                const fractureLines = ProceduralFragmentationEngine.generateFractureLines(
+                    impactData.impactPoint, target.radius, material, stressWaves
+                );
+
+                // Create fragments based on fracture pattern
+                return ProceduralFragmentationEngine.createFragmentsFromFractures(
+                    target, projectile, fractureLines, impactData
+                );
+            }
+
+            static updateFragmentEvolution(fragment, timeStep) {
+                if (!fragment.isFragment) return;
+
+                // Age the fragment
+                fragment.age += timeStep;
+
+                // Temperature evolution
+                if (fragment.temperature > 300) {
+                    const coolingRate = fragment.coolingRate || 1e-3;
+                    fragment.temperature -= coolingRate * timeStep * 1000;
+                    fragment.temperature = Math.max(fragment.temperature, 300);
+                }
+
+                // Structural evolution
+                if (fragment.fragmentType === 'vapor') {
+                    fragment.radius += fragment.expansionRate * timeStep;
+                    fragment.density *= 0.999; // Expansion reduces density
+                    fragment.opacity *= 0.998; // Vapor dissipates
+                }
+
+                // Sublimation/erosion for small fragments
+                if (fragment.mass < fragment.originalMass * 0.1 && fragment.age > 100) {
+                    fragment.mass *= (1 - fragment.sublimationRate * timeStep);
+                    fragment.radius = Math.pow(3 * fragment.mass / (4 * Math.PI * fragment.density), 1/3);
+                }
+
+                // Structural integrity degradation
+                if (fragment.structuralIntegrity < 0.3 && fragment.age > 50) {
+                    // Fragment may break apart further
+                    return this.secondaryFragmentation(fragment);
+                }
+
+                return null; // No secondary fragmentation
+            }
+
+            static secondaryFragmentation(fragment) {
+                if (fragment.mass < fragment.originalMass * 0.001) return null;
+
+                const numSubFragments = 2 + Math.floor(Math.random() * 3);
+                const subFragments = [];
+
+                for (let i = 0; i < numSubFragments; i++) {
+                    const subMass = fragment.mass / numSubFragments * (0.5 + Math.random());
+                    const subRadius = Math.pow(3 * subMass / (4 * Math.PI * fragment.density), 1/3);
+
+                    const angle = (2 * Math.PI * i) / numSubFragments + Math.random() * 0.5;
+                    const speed = 10 + Math.random() * 20;
+
+                    subFragments.push({
+                        ...fragment,
+                        id: Date.now() + Math.random(),
+                        mass: subMass,
+                        radius: subRadius,
+                        position: {
+                            x: fragment.position.x + Math.cos(angle) * fragment.radius,
+                            y: fragment.position.y + Math.sin(angle) * fragment.radius
+                        },
+                        velocity: {
+                            x: fragment.velocity.x + Math.cos(angle) * speed,
+                            y: fragment.velocity.y + Math.sin(angle) * speed
+                        },
+                        age: 0,
+                        fragmentType: 'secondary',
+                        structuralIntegrity: Math.random() * 0.5
+                    });
+                }
+
+                return subFragments;
+            }
+        }
+
+        // =====================================================
+        // ADVANCED RENDERING ENGINE
+        // =====================================================
+
+        class AdvancedRenderingEngine {
+            static renderObject(ctx, obj, simulationParams) {
+                const { position, radius, mass, isFragment, fragmentType, material, temperature, brightness, aspectRatio, orientation, age } = obj;
+
+                // Material-based rendering
+                const materialProps = MaterialProperties[material] || MaterialProperties.rock;
+                let { r, g, b } = materialProps.color;
+
+                let effectiveRenderTemperature = temperature;
+                if (isFragment && age < 0.5) { // age is in seconds
+                    effectiveRenderTemperature = temperature + 300;
+                }
+
+                // Temperature-based color modification
+                if (effectiveRenderTemperature > materialProps.meltingPoint) {
+                    const heatFactor = Math.min((effectiveRenderTemperature - materialProps.meltingPoint) / 1000, 1);
+                    r = Math.min(255, r + heatFactor * (255 - r));
+                    g = Math.min(255, g + heatFactor * 100);
+                    b = Math.max(0, b - heatFactor * 100);
+                }
+
+                // Fragment-specific rendering
+                if (isFragment) {
+                    const alpha = this.calculateFragmentAlpha(obj);
+
+                    if (fragmentType === 'vapor') {
+                        this.renderVaporParticle(ctx, obj, r, g, b, alpha);
+                    } else if (fragmentType === 'melt') {
+                        this.renderMeltDroplet(ctx, obj, r, g, b);
+                    } else if (fragmentType === 'spall') {
+                        this.renderSpallFragment(ctx, obj, r, g, b);
+                    } else {
+                        this.renderSolidFragment(ctx, obj, r, g, b, alpha);
+                    }
+                } else {
+                    this.renderMainObject(ctx, obj, r, g, b);
+                }
+
+                // Render thermal glow for hot objects
+                if (effectiveRenderTemperature > materialProps.meltingPoint * 0.8) {
+                    this.renderThermalGlow(ctx, obj, effectiveRenderTemperature, materialProps.meltingPoint);
+                }
+
+                // Render object information for main objects
+                if (!isFragment && radius > 8) {
+                    this.renderObjectInfo(ctx, obj);
+                }
+            }
+
+            static calculateFragmentAlpha(fragment) {
+                let alpha = 0.8;
+
+                if (fragment.fragmentType === 'debris') alpha = 0.4;
+                else if (fragment.fragmentType === 'small') alpha = 0.6;
+                else if (fragment.fragmentType === 'vapor') alpha = fragment.opacity || 0.3;
+
+                // Age-based fading
+                if (fragment.age > 50) {
+                    alpha *= Math.exp(-(fragment.age - 50) / 100);
+                }
+
+                return Math.max(alpha, 0.1);
+            }
+
+            static renderVaporParticle(ctx, obj, r, g, b, alpha) {
+                const gradient = ctx.createRadialGradient(
+                    obj.position.x, obj.position.y, 0,
+                    obj.position.x, obj.position.y, obj.radius * 3
+                );
+                gradient.addColorStop(0, `rgba(${r}, ${g}, ${b}, ${alpha})`);
+                gradient.addColorStop(0.5, `rgba(${r}, ${g}, ${b}, ${alpha * 0.5})`);
+                gradient.addColorStop(1, `rgba(${r}, ${g}, ${b}, 0)`);
+
+                ctx.fillStyle = gradient;
+                ctx.beginPath();
+                ctx.arc(obj.position.x, obj.position.y, obj.radius * 3, 0, 2 * Math.PI);
+                ctx.fill();
+            }
+
+            static renderMeltDroplet(ctx, obj, r, g, b) {
+                // Render with liquid-like appearance
+                const gradient = ctx.createRadialGradient(
+                    obj.position.x - obj.radius * 0.3, obj.position.y - obj.radius * 0.3, 0,
+                    obj.position.x, obj.position.y, obj.radius
+                );
+                gradient.addColorStop(0, `rgba(${Math.min(255, r + 50)}, ${Math.min(255, g + 30)}, ${b}, 0.9)`);
+                gradient.addColorStop(1, `rgba(${r}, ${g}, ${b}, 0.7)`);
+
+                ctx.fillStyle = gradient;
+                ctx.beginPath();
+                ctx.arc(obj.position.x, obj.position.y, obj.radius, 0, 2 * Math.PI);
+                ctx.fill();
+
+                // Add liquid shine
+                ctx.fillStyle = `rgba(255, 255, 255, 0.4)`;
+                ctx.beginPath();
+                ctx.arc(obj.position.x - obj.radius * 0.3, obj.position.y - obj.radius * 0.3, obj.radius * 0.3, 0, 2 * Math.PI);
+                ctx.fill();
+            }
+
+            static renderSpallFragment(ctx, obj, r, g, b) {
+                // Render elongated spall fragments
+                ctx.save();
+                ctx.translate(obj.position.x, obj.position.y);
+                ctx.rotate(obj.orientation);
+
+                const width = obj.radius * 2;
+                const height = obj.radius * 2 / obj.aspectRatio;
+
+                ctx.fillStyle = `rgba(${r}, ${g}, ${b}, 0.8)`;
+                ctx.fillRect(-width/2, -height/2, width, height);
+
+                ctx.strokeStyle = `rgba(255, 255, 255, 0.6)`;
+                ctx.lineWidth = 1;
+                ctx.strokeRect(-width/2, -height/2, width, height);
+
+                ctx.restore();
+            }
+
+            static renderSolidFragment(ctx, obj, r, g, b, alpha) {
+                // Render irregular solid fragments
+                if (obj.aspectRatio && obj.aspectRatio !== 1) {
+                    ctx.save();
+                    ctx.translate(obj.position.x, obj.position.y);
+                    ctx.rotate(obj.orientation);
+                    ctx.scale(1, 1 / obj.aspectRatio);
+
+                    ctx.fillStyle = `rgba(${r}, ${g}, ${b}, ${alpha})`;
+                    ctx.beginPath();
+                    ctx.arc(0, 0, obj.radius, 0, 2 * Math.PI);
+                    ctx.fill();
+
+                    ctx.strokeStyle = `rgba(255, 255, 255, ${alpha * 0.7})`;
+                    ctx.lineWidth = 0.5;
+                    ctx.stroke();
+
+                    ctx.restore();
+                } else {
+                    ctx.fillStyle = `rgba(${r}, ${g}, ${b}, ${alpha})`;
+                    ctx.beginPath();
+                    ctx.arc(obj.position.x, obj.position.y, obj.radius, 0, 2 * Math.PI);
+                    ctx.fill();
+
+                    ctx.strokeStyle = `rgba(255, 255, 255, ${alpha * 0.7})`;
+                    ctx.lineWidth = 0.5;
+                    ctx.stroke();
+                }
+            }
+
+            static renderMainObject(ctx, obj, r, g, b) {
+                // High-quality rendering for main objects
+                const gradient = ctx.createRadialGradient(
+                    obj.position.x - obj.radius * 0.3, obj.position.y - obj.radius * 0.3, 0,
+                    obj.position.x, obj.position.y, obj.radius
+                );
+                gradient.addColorStop(0, `rgba(${Math.min(255, r + 40)}, ${Math.min(255, g + 20)}, ${Math.min(255, b + 10)}, 0.9)`);
+                gradient.addColorStop(1, `rgba(${r}, ${g}, ${b}, 0.9)`);
+
+                ctx.fillStyle = gradient;
+                ctx.beginPath();
+                ctx.arc(obj.position.x, obj.position.y, obj.radius, 0, 2 * Math.PI);
+                ctx.fill();
+
+                ctx.strokeStyle = 'rgba(255, 255, 255, 0.8)';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+
+                // Add surface texture for larger objects
+                if (obj.radius > 10) {
+                    this.renderSurfaceTexture(ctx, obj);
+                }
+            }
+
+            static renderSurfaceTexture(ctx, obj) {
+                ctx.save();
+                ctx.globalAlpha = 0.3;
+
+                // Add some surface features
+                for (let i = 0; i < 8; i++) {
+                    const angle = (2 * Math.PI * i) / 8;
+                    const craterRadius = obj.radius * (0.1 + Math.random() * 0.2);
+                    const distance = obj.radius * (0.3 + Math.random() * 0.4);
+
+                    const x = obj.position.x + Math.cos(angle) * distance;
+                    const y = obj.position.y + Math.sin(angle) * distance;
+
+                    ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+                    ctx.beginPath();
+                    ctx.arc(x, y, craterRadius, 0, 2 * Math.PI);
+                    ctx.fill();
+                }
+
+                ctx.restore();
+            }
+
+            static renderThermalGlow(ctx, obj, temperature, meltingPoint) {
+                const glowIntensity = Math.min((temperature - meltingPoint * 0.8) / (meltingPoint * 0.2), 1);
+                const glowRadius = obj.radius * (2 + glowIntensity * 2);
+
+                const gradient = ctx.createRadialGradient(
+                    obj.position.x, obj.position.y, obj.radius,
+                    obj.position.x, obj.position.y, glowRadius
+                );
+
+                const glowColor = temperature > meltingPoint * 1.5 ?
+                    `rgba(255, 255, 200, ${glowIntensity * 0.4})` :
+                    `rgba(255, 150, 50, ${glowIntensity * 0.3})`;
+
+                gradient.addColorStop(0, glowColor);
+                gradient.addColorStop(1, 'rgba(255, 100, 0, 0)');
+
+                ctx.fillStyle = gradient;
+                ctx.beginPath();
+                ctx.arc(obj.position.x, obj.position.y, glowRadius, 0, 2 * Math.PI);
+                ctx.fill();
+            }
+
+            static renderObjectInfo(ctx, obj) {
+                ctx.fillStyle = 'white';
+                ctx.font = '10px Arial';
+                ctx.textAlign = 'center';
+                ctx.fillText(
+                    `${(obj.mass / 1e12).toFixed(1)}T`,
+                    obj.position.x,
+                    obj.position.y - obj.radius - 8
+                );
+
+                if (obj.material !== 'rock') {
+                    ctx.fillText(
+                        obj.material.toUpperCase(),
+                        obj.position.x,
+                        obj.position.y - obj.radius - 20
+                    );
+                }
+            }
+
+            static renderVelocityVector(ctx, obj, scale = 10) {
+                if (obj.isFragment && obj.fragmentType === 'debris') return; // Skip for small debris
+
+                const startX = obj.position.x;
+                const startY = obj.position.y;
+                const endX = startX + obj.velocity.x * scale;
+                const endY = startY + obj.velocity.y * scale;
+
+                const speed = Math.sqrt(obj.velocity.x ** 2 + obj.velocity.y ** 2);
+                const maxSpeed = 200;
+                const intensity = Math.min(speed / maxSpeed, 1);
+
+                ctx.strokeStyle = `rgba(255, 255, 0, ${0.6 + intensity * 0.4})`;
+                ctx.lineWidth = obj.isFragment ? 1 : 2;
+                ctx.beginPath();
+                ctx.moveTo(startX, startY);
+                ctx.lineTo(endX, endY);
+                ctx.stroke();
+
+                // Arrow head
+                const headLength = obj.isFragment ? 5 : 8;
+                const angle = Math.atan2(endY - startY, endX - startX);
+
+                ctx.beginPath();
+                ctx.moveTo(endX, endY);
+                ctx.lineTo(endX - headLength * Math.cos(angle - Math.PI/6),
+                          endY - headLength * Math.sin(angle - Math.PI/6));
+                ctx.moveTo(endX, endY);
+                ctx.lineTo(endX - headLength * Math.cos(angle + Math.PI/6),
+                          endY - headLength * Math.sin(angle + Math.PI/6));
+                ctx.stroke();
+            }
+
+            static renderTrajectory(ctx, trajectory, objId) {
+                if (trajectory.length < 2) return;
+
+                ctx.strokeStyle = 'rgba(74, 144, 226, 0.4)';
+                ctx.lineWidth = 1;
+                ctx.setLineDash([2, 2]);
+
+                ctx.beginPath();
+                ctx.moveTo(trajectory[0].x, trajectory[0].y);
+
+                for (let i = 1; i < trajectory.length; i++) {
+                    const alpha = i / trajectory.length; // Fade older trajectory points
+                    ctx.globalAlpha = alpha * 0.4;
+                    ctx.lineTo(trajectory[i].x, trajectory[i].y);
+                }
+
+                ctx.stroke();
+                ctx.setLineDash([]);
+                ctx.globalAlpha = 1;
+            }
+
+            static renderGravitationalField(ctx, objects, width, height) {
+                ctx.strokeStyle = 'rgba(74, 144, 226, 0.15)';
+                ctx.lineWidth = 0.5;
+
+                const gridSize = 50;
+
+                for (let x = 0; x < width; x += gridSize) {
+                    for (let y = 0; y < height; y += gridSize) {
+                        let fx = 0, fy = 0;
+
+                        objects.forEach(obj => {
+                            if (!obj.isFragment || obj.fragmentType === 'remnant') {
+                                const dx = obj.position.x - x;
+                                const dy = obj.position.y - y;
+                                const dist = Math.sqrt(dx * dx + dy * dy);
+
+                                if (dist > obj.radius && dist < 300) {
+                                    const force = PhysicsConstants.G * obj.mass / (dist * dist);
+                                    fx += force * dx / dist;
+                                    fy += force * dy / dist;
+                                }
+                            }
+                        });
+
+                        const fieldMagnitude = Math.sqrt(fx * fx + fy * fy);
+                        if (fieldMagnitude > 1e-8) {
+                            const scale = Math.min(fieldMagnitude * 1e12, 25);
+                            const alpha = Math.min(fieldMagnitude * 1e10, 0.3);
+
+                            ctx.strokeStyle = `rgba(74, 144, 226, ${alpha})`;
+                            ctx.beginPath();
+                            ctx.moveTo(x, y);
+                            ctx.lineTo(x + fx * scale, y + fy * scale);
+                            ctx.stroke();
+                        }
+                    }
+                }
+            }
+
+            static renderStarField(ctx, width, height) {
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+
+                // Generate consistent star field
+                for (let i = 0; i < 200; i++) {
+                    const x = (i * 137.5) % width;
+                    const y = (i * 241.7) % height;
+                    const brightness = (i * 17) % 100 / 100;
+
+                    ctx.globalAlpha = brightness * 0.8 + 0.2;
+                    ctx.fillRect(x, y, 1, 1);
+
+                    // Add some larger stars
+                    if (i % 20 === 0) {
+                        ctx.fillRect(x-1, y, 3, 1);
+                        ctx.fillRect(x, y-1, 1, 3);
+                    }
+                }
+
+                ctx.globalAlpha = 1;
+            }
+
+            static renderCenterOfMass(ctx, centerOfMass) {
+                const { x, y } = centerOfMass;
+
+                // Pulsating center of mass indicator
+                const time = Date.now() * 0.005;
+                const pulseSize = 3 + Math.sin(time) * 1;
+
+                ctx.fillStyle = 'rgba(255, 255, 0, 0.9)';
+                ctx.beginPath();
+                ctx.arc(x, y, pulseSize, 0, 2 * Math.PI);
+                ctx.fill();
+
+                ctx.strokeStyle = 'rgba(255, 255, 0, 0.6)';
+                ctx.lineWidth = 1;
+                ctx.beginPath();
+                ctx.moveTo(x - 15, y);
+                ctx.lineTo(x + 15, y);
+                ctx.moveTo(x, y - 15);
+                ctx.lineTo(x, y + 15);
+                ctx.stroke();
+
+                // Add orbital indicators
+                ctx.strokeStyle = 'rgba(255, 255, 0, 0.3)';
+                ctx.setLineDash([3, 3]);
+                ctx.beginPath();
+                ctx.arc(x, y, 20, 0, 2 * Math.PI);
+                ctx.stroke();
+                ctx.setLineDash([]);
+            }
+        }
+
+        // =====================================================
+        // SIMULATION STATE MANAGEMENT
+        // =====================================================
+
+        const SimulationContext = createContext();
+
+        const simulationReducer = (state, action) => {
+            switch (action.type) {
+                case 'SET_OBJECTS':
+                    return { ...state, objects: action.payload };
+
+                case 'ADD_OBJECT':
+                    return {
+                        ...state,
+                        objects: [...state.objects, { ...action.payload, id: Date.now() + Math.random() }]
+                    };
+
+                case 'UPDATE_PHYSICS':
+                    return {
+                        ...state,
+                        objects: action.payload.objects,
+                        totalKineticEnergy: action.payload.totalKineticEnergy,
+                        totalPotentialEnergy: action.payload.totalPotentialEnergy,
+                        centerOfMass: action.payload.centerOfMass,
+                        totalMomentum: action.payload.totalMomentum,
+                        // impactFlashEffects is now solely managed by this reducer case
+                        impactFlashEffects: state.impactFlashEffects.filter(
+                            effect => effect.startTime + 500 >= Date.now() // 500ms duration
+                        )
+                    };
+
+                case 'ADD_COLLISION_EVENT':
+                    {
+                        const newFlashEffect = {
+                            id: Date.now() + Math.random() + 'flash',
+                            x: action.payload.impactData.impactPoint.x,
+                            y: action.payload.impactData.impactPoint.y,
+                            initialEnergy: action.payload.impactData.kineticEnergy,
+                            startTime: Date.now()
+                        };
+                        return {
+                            ...state,
+                            collisionEvents: [action.payload, ...state.collisionEvents.slice(0, 99)],
+                            impactFlashEffects: [...state.impactFlashEffects, newFlashEffect]
+                        };
+                    }
+
+                case 'UPDATE_SIMULATION_PARAMS':
+                    return {
+                        ...state,
+                        simulationParams: { ...state.simulationParams, ...action.payload }
+                    };
+
+                case 'CLEAR_SIMULATION':
+                    return {
+                        ...state,
+                        objects: [],
+                        collisionEvents: [],
+                        totalKineticEnergy: 0,
+                        totalPotentialEnergy: 0,
+                        totalMomentum: { x: 0, y: 0 }
+                    };
+
+                case 'SET_PRESET':
+                    return {
+                        ...state,
+                        objects: action.payload.objects,
+                        simulationParams: { ...state.simulationParams, ...action.payload.params }
+                    };
+
+                default:
+                    return state;
+            }
+        };
+
+        // =====================================================
+        // ENHANCED SIMULATION PRESETS
+        // =====================================================
+
+        const EnhancedSimulationPresets = {
+            'Asteroid Belt Collision': {
+                objects: [
+                    {
+                        mass: 8e12, radius: 18, density: 2700, material: 'rock',
+                        position: { x: 300, y: 300 }, velocity: { x: 40, y: 20 },
+                        acceleration: { x: 0, y: 0 }, isFragment: false, temperature: 280
+                    },
+                    {
+                        mass: 6e12, radius: 15, density: 2700, material: 'rock',
+                        position: { x: 500, y: 300 }, velocity: { x: -50, y: -15 },
+                        acceleration: { x: 0, y: 0 }, isFragment: false, temperature: 290
+                    }
+                ],
+                params: { timeStep: 0.016, showTrajectories: true, maxFragments: 200 }
+            },
+
+            'Catastrophic Disruption': {
+                objects: [
+                    {
+                        mass: 12e12, radius: 22, density: 2700, material: 'rock',
+                        position: { x: 400, y: 300 }, velocity: { x: 0, y: 0 },
+                        acceleration: { x: 0, y: 0 }, isFragment: false, temperature: 300
+                    },
+                    {
+                        mass: 4e12, radius: 13, density: 2700, material: 'rock',
+                        position: { x: 120, y: 300 }, velocity: { x: 300, y: 0 },
+                        acceleration: { x: 0, y: 0 }, isFragment: false, temperature: 280
+                    }
+                ],
+                params: { timeStep: 0.016, showTrajectories: true, maxFragments: 250 }
+            },
+
+            'Comet Impact': {
+                objects: [
+                    {
+                        mass: 10e12, radius: 20, density: 2700, material: 'rock',
+                        position: { x: 400, y: 300 }, velocity: { x: 0, y: 0 },
+                        acceleration: { x: 0, y: 0 }, isFragment: false, temperature: 300
+                    },
+                    {
+                        mass: 2e12, radius: 14, density: 917, material: 'ice',
+                        position: { x: 100, y: 200 }, velocity: { x: 180, y: 100 },
+                        acceleration: { x: 0, y: 0 }, isFragment: false, temperature: 200
+                    }
+                ],
+                params: { timeStep: 0.016, showTrajectories: true, maxFragments: 200 }
+            },
+
+            'Metal Asteroid Strike': {
+                objects: [
+                    {
+                        mass: 7e12, radius: 17, density: 2700, material: 'rock',
+                        position: { x: 400, y: 300 }, velocity: { x: 10, y: 5 },
+                        acceleration: { x: 0, y: 0 }, isFragment: false, temperature: 300
+                    },
+                    {
+                        mass: 5e12, radius: 12, density: 7800, material: 'metal',
+                        position: { x: 180, y: 180 }, velocity: { x: 120, y: 90 },
+                        acceleration: { x: 0, y: 0 }, isFragment: false, temperature: 400
+                    }
+                ],
+                params: { timeStep: 0.016, showTrajectories: true, maxFragments: 180 }
+            },
+
+            'Carbonaceous Chondrite': {
+                objects: [
+                    {
+                        mass: 9e12, radius: 19, density: 2700, material: 'rock',
+                        position: { x: 400, y: 300 }, velocity: { x: 0, y: 0 },
+                        acceleration: { x: 0, y: 0 }, isFragment: false, temperature: 290
+                    },
+                    {
+                        mass: 3e12, radius: 16, density: 1300, material: 'carbonaceous',
+                        position: { x: 150, y: 250 }, velocity: { x: 140, y: 70 },
+                        acceleration: { x: 0, y: 0 }, isFragment: false, temperature: 250
+                    }
+                ],
+                params: { timeStep: 0.016, showTrajectories: true, maxFragments: 300 }
+            },
+
+            'Multi-Body Chaos': {
+                objects: [
+                    {
+                        mass: 6e12, radius: 16, density: 2700, material: 'rock',
+                        position: { x: 250, y: 200 }, velocity: { x: 50, y: 60 },
+                        acceleration: { x: 0, y: 0 }, isFragment: false, temperature: 300
+                    },
+                    {
+                        mass: 5e12, radius: 14, density: 2700, material: 'rock',
+                        position: { x: 550, y: 300 }, velocity: { x: -40, y: 40 },
+                        acceleration: { x: 0, y: 0 }, isFragment: false, temperature: 290
+                    },
+                    {
+                        mass: 4e12, radius: 13, density: 917, material: 'ice',
+                        position: { x: 400, y: 450 }, velocity: { x: -20, y: -80 },
+                        acceleration: { x: 0, y: 0 }, isFragment: false, temperature: 250
+                    }
+                ],
+                params: { timeStep: 0.016, showTrajectories: true, maxFragments: 220 }
+            }
+        };
+
+        // =====================================================
+        // MAIN SIMULATION COMPONENT
+        // =====================================================
+
+        const AdvancedGravitationalCollisionSimulator = () => {
+            // State Management
+            const [state, dispatch] = useReducer(simulationReducer, {
+                objects: [],
+                collisionEvents: [],
+                simulationParams: {
+                    timeStep: 0.016,
+                    gravitationalConstant: PhysicsConstants.G,
+                    showTrajectories: true,
+                    showVelocityVectors: true,
+                    showGravitationalField: false,
+                    showThermalEffects: true,
+                    autoZoom: false,
+                    fragmentLifetime: 2000,
+                    maxFragments: 250,
+                    realtimePhysics: true
+                },
+                totalKineticEnergy: 0,
+                totalPotentialEnergy: 0,
+                totalMomentum: { x: 0, y: 0 },
+                centerOfMass: { x: 0, y: 0 },
+                impactFlashEffects: [], // Initial state for impact flashes
+                isRunning: false
+            });
+
+            // Canvas and Animation References
+            const canvasRef = useRef(null);
+            const animationRef = useRef();
+            const trajectoryData = useRef(new Map());
+            const mousePos = useRef({ x: 0, y: 0 });
+            const isCreatingObject = useRef(false);
+            const creationStart = useRef({ x: 0, y: 0 });
+            const lastFrameTime = useRef(Date.now());
+
+            // Object Creation State
+            const [objectCreation, setObjectCreation] = useState({
+                mass: 5e12,
+                radius: 15,
+                density: 2700,
+                material: 'rock',
+                temperature: 300
+            });
+
+            // UI State
+            const [isRunning, setIsRunning] = useState(false);
+            const [selectedPreset, setSelectedPreset] = useState('');
+            const [showAdvanced, setShowAdvanced] = useState(false);
+            const [performanceStats, setPerformanceStats] = useState({
+                fps: 60,
+                objectCount: 0,
+                fragmentCount: 0
+            });
+
+            // =====================================================
+            // ADVANCED PHYSICS UPDATE LOGIC
+            // =====================================================
+
+            const updateAdvancedPhysics = useCallback(() => {
+                if (!state.objects.length) return;
+
+                const currentTime = Date.now();
+                const deltaTime = (currentTime - lastFrameTime.current) / 1000;
+                lastFrameTime.current = currentTime;
+
+                let newObjects = [...state.objects];
+                const collisions = [];
+                const secondaryFragments = [];
+
+                let totalKE = 0;
+                let totalPE = 0;
+                let totalMass = 0;
+                let comX = 0, comY = 0;
+                let momX = 0, momY = 0;
+
+                // Update fragment evolution and calculate system properties
+                newObjects.forEach((obj, index) => {
+                    totalMass += obj.mass;
+                    comX += obj.position.x * obj.mass;
+                    comY += obj.position.y * obj.mass;
+                    momX += obj.velocity.x * obj.mass;
+                    momY += obj.velocity.y * obj.mass;
+
+                    const speed = Math.sqrt(obj.velocity.x ** 2 + obj.velocity.y ** 2);
+                    totalKE += 0.5 * obj.mass * speed ** 2;
+
+                    // Fragment evolution
+                    if (obj.isFragment) {
+                        const subFragments = AdvancedPhysicsEngine.updateFragmentEvolution(obj, deltaTime);
+                        if (subFragments) {
+                            secondaryFragments.push(...subFragments);
+                        }
+                    }
+                });
+
+                if (totalMass > 0) {
+                    comX /= totalMass;
+                    comY /= totalMass;
+                }
+
+                // Gravitational interactions and collision detection
+                for (let i = 0; i < newObjects.length; i++) {
+                    for (let j = i + 1; j < newObjects.length; j++) {
+                        const obj1 = newObjects[i];
+                        const obj2 = newObjects[j];
+
+                        // Skip interactions between very small fragments
+                        if (obj1.isFragment && obj2.isFragment &&
+                            obj1.fragmentType === 'debris' && obj2.fragmentType === 'debris') {
+                            continue;
+                        }
+
+                        const dx = obj2.position.x - obj1.position.x;
+                        const dy = obj2.position.y - obj1.position.y;
+                        const distance = Math.sqrt(dx * dx + dy * dy);
+
+                        // Calculate potential energy
+                        if (distance > PhysicsConstants.MIN_DISTANCE) {
+                            totalPE -= PhysicsConstants.G * obj1.mass * obj2.mass / distance;
+                        }
+
+                        if (AdvancedPhysicsEngine.detectCollision(obj1, obj2)) {
+                            const impactData = AdvancedPhysicsEngine.calculateDetailedImpactParameters(obj1, obj2);
+                            const fragments = AdvancedPhysicsEngine.generateAdvancedFragments(obj1, obj2, impactData);
+
+                            collisions.push({
+                                objects: [i, j],
+                                fragments,
+                                impactData,
+                                timestamp: Date.now()
+                            });
+                        } else {
+                            const accelerations = AdvancedPhysicsEngine.updateGravitationalAcceleration(obj1, obj2);
+                            obj1.acceleration.x += accelerations.object1.ax;
+                            obj1.acceleration.y += accelerations.object1.ay;
+                            obj2.acceleration.x += accelerations.object2.ax;
+                            obj2.acceleration.y += accelerations.object2.ay;
+                        }
+                    }
+                }
+
+                // Add secondary fragments
+                if (secondaryFragments.length > 0) {
+                    newObjects.push(...secondaryFragments);
+                }
+
+                // Process collisions
+                if (collisions.length > 0) {
+                    const indicesToRemove = new Set();
+                    const fragmentsToAdd = [];
+
+                    collisions.forEach(collision => {
+                        indicesToRemove.add(collision.objects[0]);
+                        indicesToRemove.add(collision.objects[1]);
+                        fragmentsToAdd.push(...collision.fragments);
+
+                        dispatch({
+                            type: 'ADD_COLLISION_EVENT',
+                            payload: {
+                                ...collision,
+                                id: Date.now() + Math.random()
+                            }
+                        });
+                    });
+
+                    const survivingObjects = newObjects.filter((_, index) => !indicesToRemove.has(index));
+                    const allNewObjects = [...survivingObjects, ...fragmentsToAdd];
+
+                    // Limit fragments for performance
+                    const limitedObjects = allNewObjects.length > state.simulationParams.maxFragments ?
+                        allNewObjects.slice(0, state.simulationParams.maxFragments) : allNewObjects;
+
+                    dispatch({
+                        type: 'UPDATE_PHYSICS',
+                        payload: {
+                            objects: limitedObjects,
+                            totalKineticEnergy: totalKE,
+                            totalPotentialEnergy: totalPE,
+                            totalMomentum: { x: momX, y: momY },
+                            centerOfMass: { x: comX, y: comY }
+                        }
+                    });
+
+                    return;
+                }
+
+                // Update positions and velocities with improved integration
+                newObjects.forEach(obj => {
+                    const dt = state.simulationParams.timeStep;
+
+                    // Velocity Verlet integration
+                    obj.velocity.x += obj.acceleration.x * dt;
+                    obj.velocity.y += obj.acceleration.y * dt;
+
+                    // Velocity limiting
+                    const speed = Math.sqrt(obj.velocity.x ** 2 + obj.velocity.y ** 2);
+                    if (speed > PhysicsConstants.MAX_VELOCITY) {
+                        const scale = PhysicsConstants.MAX_VELOCITY / speed;
+                        obj.velocity.x *= scale;
+                        obj.velocity.y *= scale;
+                    }
+
+                    obj.position.x += obj.velocity.x * dt;
+                    obj.position.y += obj.velocity.y * dt;
+
+                    // Update orientation for rotating fragments
+                    if (obj.isFragment && obj.angularVelocity) {
+                        obj.orientation = (obj.orientation || 0) + obj.angularVelocity * dt;
+                    }
+
+                    // Update trajectory data
+                    if (state.simulationParams.showTrajectories && (!obj.isFragment || obj.fragmentType === 'remnant')) {
+                        if (!trajectoryData.current.has(obj.id)) {
+                            trajectoryData.current.set(obj.id, []);
+                        }
+                        const trajectory = trajectoryData.current.get(obj.id);
+                        trajectory.push({ x: obj.position.x, y: obj.position.y });
+                        if (trajectory.length > 150) trajectory.shift();
+                    }
+
+                    // Reset acceleration
+                    obj.acceleration.x = 0;
+                    obj.acceleration.y = 0;
+                });
+
+                // Remove objects that have drifted too far or become too small
+                const filteredObjects = newObjects.filter(obj => {
+                    const canvas = canvasRef.current;
+                    const centerX = canvas ? canvas.width / 2 : 400;
+                    const centerY = canvas ? canvas.height / 2 : 300;
+                    const distanceFromCenter = Math.sqrt(
+                        (obj.position.x - centerX) ** 2 + (obj.position.y - centerY) ** 2
+                    );
+
+                    const massThreshold = obj.isFragment ? 1e6 : 1e8;
+                    const distanceThreshold = 3000;
+
+                    return distanceFromCenter < distanceThreshold && obj.mass > massThreshold;
+                });
+
+                // Update performance stats
+                setPerformanceStats({
+                    fps: Math.round(1 / deltaTime),
+                    objectCount: filteredObjects.length,
+                    fragmentCount: filteredObjects.filter(obj => obj.isFragment).length
+                });
+
+                dispatch({
+                    type: 'UPDATE_PHYSICS',
+                    payload: {
+                        objects: filteredObjects,
+                        totalKineticEnergy: totalKE,
+                        totalPotentialEnergy: totalPE,
+                        totalMomentum: { x: momX, y: momY },
+                        centerOfMass: { x: comX, y: comY }
+                        // No longer sending impactFlashEffects from here
+                    }
+                });
+            }, [state.objects, state.simulationParams, state.impactFlashEffects]); // state.impactFlashEffects still needed for reducer to access current state
+
+            // =====================================================
+            // ADVANCED RENDERING LOGIC
+            // =====================================================
+
+            const renderAdvancedSimulation = useCallback(() => {
+                const canvas = canvasRef.current;
+                if (!canvas) return;
+
+                // Match drawing buffer size to display size
+                canvas.width = canvas.clientWidth;
+                canvas.height = canvas.clientHeight;
+
+                const ctx = canvas.getContext('2d');
+                const width = canvas.width; // Use these for rendering logic
+                const height = canvas.height; // Use these for rendering logic
+
+                // Default camera parameters
+                const defaultZoom = 1.5; // Initial zoom factor
+                const worldViewCenterX = 400; // World X coordinate to center on
+                const worldViewCenterY = 300; // World Y coordinate to center on
+
+                // Clear canvas
+                ctx.fillStyle = '#000000';
+                ctx.fillRect(0, 0, width, height);
+
+                // Apply camera transformations
+                ctx.save();
+                ctx.translate(width / 2, height / 2); // Move canvas origin to its center
+                ctx.scale(defaultZoom, defaultZoom); // Apply zoom
+                ctx.translate(-worldViewCenterX, -worldViewCenterY); // Pan world to center
+
+                // Render star field
+                AdvancedRenderingEngine.renderStarField(ctx, width, height); // Stars might need adjustment if they are parallaxed
+
+                // Render gravitational field
+                if (state.simulationParams.showGravitationalField && state.objects.length > 0) {
+                    AdvancedRenderingEngine.renderGravitationalField(ctx, state.objects, width, height);
+                }
+
+                // Render trajectories
+                if (state.simulationParams.showTrajectories) {
+                    trajectoryData.current.forEach((trajectory, objId) => {
+                        AdvancedRenderingEngine.renderTrajectory(ctx, trajectory, objId);
+                    });
+                }
+
+                // Sort objects for proper rendering order (fragments behind main objects)
+                const sortedObjects = [...state.objects].sort((a, b) => {
+                    if (a.isFragment && !b.isFragment) return -1;
+                    if (!a.isFragment && b.isFragment) return 1;
+                    if (a.isFragment && b.isFragment) {
+                        // Render vapor and debris first
+                        const order = { vapor: 0, debris: 1, small: 2, medium: 3, large: 4, remnant: 5, spall: 3, melt: 4 };
+                        return (order[a.fragmentType] || 3) - (order[b.fragmentType] || 3);
+                    }
+                    return 0;
+                });
+
+                // Render objects
+                sortedObjects.forEach(obj => {
+                    AdvancedRenderingEngine.renderObject(ctx, obj, state.simulationParams);
+                });
+
+                // Render velocity vectors
+                if (state.simulationParams.showVelocityVectors) {
+                    state.objects.forEach(obj => {
+                        if (!obj.isFragment || obj.fragmentType === 'remnant' || obj.fragmentType === 'large') {
+                            AdvancedRenderingEngine.renderVelocityVector(ctx, obj, obj.isFragment ? 5 : 10);
+                        }
+                    });
+                }
+
+                // Render center of mass
+                if (state.objects.length > 1) {
+                    AdvancedRenderingEngine.renderCenterOfMass(ctx, state.centerOfMass);
+                }
+
+                // Render Impact Flashes
+                const maxFlashDuration = 500; // ms
+                state.impactFlashEffects.forEach(effect => {
+                    const currentAge = Date.now() - effect.startTime;
+                    if (currentAge < maxFlashDuration) {
+                        const progress = currentAge / maxFlashDuration;
+                        const currentRadius = (10 + Math.sqrt(effect.initialEnergy * 1e-16)) * progress;
+                        const alpha = (1 - progress) * 0.8; // Fades out
+
+                        ctx.beginPath();
+                        ctx.arc(effect.x, effect.y, currentRadius, 0, 2 * Math.PI);
+                        ctx.fillStyle = `rgba(255, 255, 200, ${alpha})`; // Bright yellow, fading
+                        ctx.fill();
+                    }
+                });
+
+                // Render creation preview (should be within the transformed context)
+                if (isCreatingObject.current) {
+                    const dx = mousePos.current.x - creationStart.current.x;
+                    const dy = mousePos.current.y - creationStart.current.y;
+                    const velocity = { x: dx * 0.1, y: dy * 0.1 };
+
+                    ctx.strokeStyle = 'rgba(255, 255, 255, 0.9)';
+                    ctx.setLineDash([5, 5]);
+                    ctx.lineWidth = 2;
+                    ctx.beginPath();
+                    ctx.arc(creationStart.current.x, creationStart.current.y, objectCreation.radius, 0, 2 * Math.PI);
+                    ctx.stroke();
+
+                    ctx.setLineDash([]);
+                    ctx.strokeStyle = 'rgba(255, 255, 0, 0.8)';
+                    ctx.lineWidth = 2;
+                    ctx.beginPath();
+                    ctx.moveTo(creationStart.current.x, creationStart.current.y);
+                    ctx.lineTo(mousePos.current.x, mousePos.current.y);
+                    ctx.stroke();
+
+                    // Velocity information
+                    const speed = Math.sqrt(velocity.x ** 2 + velocity.y ** 2);
+                    ctx.fillStyle = 'white';
+                    ctx.font = '12px Arial';
+                    ctx.textAlign = 'left';
+                    ctx.fillText(
+                        `Velocity: ${speed.toFixed(1)} m/s`,
+                        mousePos.current.x + 15,
+                        mousePos.current.y - 10
+                    );
+                    ctx.fillText(
+                        `Material: ${objectCreation.material}`,
+                        mousePos.current.x + 15,
+                        mousePos.current.y + 5
+                    );
+                }
+
+                // Restore context after drawing all world-based elements
+                ctx.restore();
+
+            }, [state.objects, state.simulationParams, state.centerOfMass, state.impactFlashEffects, objectCreation, isCreatingObject.current, mousePos.current, creationStart.current]); // Added interaction refs and impactFlashEffects to dependency array
+
+            // =====================================================
+            // ANIMATION LOOP
+            // =====================================================
+
+            useEffect(() => {
+                if (isRunning) {
+                    const animate = () => {
+                        updateAdvancedPhysics();
+                        renderAdvancedSimulation();
+                        animationRef.current = requestAnimationFrame(animate);
+                    };
+                    animate();
+                } else {
+                    renderAdvancedSimulation();
+                }
+
+                return () => {
+                    if (animationRef.current) {
+                        cancelAnimationFrame(animationRef.current);
+                    }
+                };
+            }, [isRunning, updateAdvancedPhysics, renderAdvancedSimulation]);
+
+            // =====================================================
+            // INTERACTION HANDLER LOGIC
+            // =====================================================
+
+            const handleInteractionStart = (clientX, clientY) => {
+                const rect = canvasRef.current.getBoundingClientRect();
+                const x = clientX - rect.left;
+                const y = clientY - rect.top;
+
+                isCreatingObject.current = true;
+                creationStart.current = { x, y };
+                mousePos.current = { x, y };
+            };
+
+            const handleInteractionMove = (clientX, clientY) => {
+                const rect = canvasRef.current.getBoundingClientRect();
+                mousePos.current = {
+                    x: clientX - rect.left,
+                    y: clientY - rect.top
+                };
+
+                if (isCreatingObject.current && !isRunning) {
+                    renderAdvancedSimulation();
+                }
+            };
+
+            const handleInteractionEnd = () => {
+                if (!isCreatingObject.current) return;
+
+                const dx = mousePos.current.x - creationStart.current.x;
+                const dy = mousePos.current.y - creationStart.current.y;
+
+                const newObject = {
+                    mass: objectCreation.mass,
+                    radius: objectCreation.radius,
+                    density: objectCreation.density,
+                    material: objectCreation.material,
+                    position: { ...creationStart.current },
+                    velocity: { x: dx * 0.4, y: dy * 0.4 },
+                    acceleration: { x: 0, y: 0 },
+                    isFragment: false,
+                    temperature: objectCreation.temperature,
+                    orientation: 0,
+                    angularVelocity: 0
+                };
+
+                dispatch({ type: 'ADD_OBJECT', payload: newObject });
+                isCreatingObject.current = false;
+
+                if (!isRunning) {
+                    renderAdvancedSimulation();
+                }
+            };
+
+            // =====================================================
+            // EVENT HANDLERS (Mouse and Touch)
+            // =====================================================
+
+            const handleCanvasMouseDown = (e) => {
+                handleInteractionStart(e.clientX, e.clientY);
+            };
+
+            const handleCanvasMouseMove = (e) => {
+                handleInteractionMove(e.clientX, e.clientY);
+            };
+
+            const handleCanvasMouseUp = () => {
+                handleInteractionEnd();
+            };
+
+            const handleTouchStart = (e) => {
+                if (e.touches.length > 0) {
+                    handleInteractionStart(e.touches[0].clientX, e.touches[0].clientY);
+                }
+            };
+
+            const handleTouchMove = (e) => {
+                if (e.touches.length > 0) {
+                    if (isCreatingObject.current) {
+                        e.preventDefault(); // Prevent scrolling while drawing
+                    }
+                    handleInteractionMove(e.touches[0].clientX, e.touches[0].clientY);
+                }
+            };
+
+            const handleTouchEnd = () => {
+                handleInteractionEnd();
+            };
+
+            useEffect(() => {
+                const canvas = canvasRef.current;
+                if (!canvas) return;
+
+                canvas.addEventListener('mousedown', handleCanvasMouseDown);
+                canvas.addEventListener('mousemove', handleCanvasMouseMove);
+                canvas.addEventListener('mouseup', handleCanvasMouseUp);
+                canvas.addEventListener('touchstart', handleTouchStart, { passive: false });
+                canvas.addEventListener('touchmove', handleTouchMove, { passive: false });
+                canvas.addEventListener('touchend', handleTouchEnd);
+                canvas.addEventListener('touchcancel', handleTouchEnd); // Handle interruption
+
+                return () => {
+                    canvas.removeEventListener('mousedown', handleCanvasMouseDown);
+                    canvas.removeEventListener('mousemove', handleCanvasMouseMove);
+                    canvas.removeEventListener('mouseup', handleCanvasMouseUp);
+                    canvas.removeEventListener('touchstart', handleTouchStart);
+                    canvas.removeEventListener('touchmove', handleTouchMove);
+                    canvas.removeEventListener('touchend', handleTouchEnd);
+                    canvas.removeEventListener('touchcancel', handleTouchEnd);
+                };
+            }, [renderAdvancedSimulation]); // Re-add if render function changes, though core logic is stable
+
+            const loadPreset = (presetName) => {
+                const preset = EnhancedSimulationPresets[presetName];
+                if (preset) {
+                    trajectoryData.current.clear();
+                    dispatch({ type: 'SET_PRESET', payload: preset });
+                    setSelectedPreset(presetName);
+                }
+            };
+
+            const clearSimulation = () => {
+                trajectoryData.current.clear();
+                dispatch({ type: 'CLEAR_SIMULATION' });
+                setIsRunning(false);
+            };
+
+            const toggleSimulation = () => {
+                setIsRunning(prev => !prev);
+            };
+
+            const updateSimulationParams = (params) => {
+                dispatch({ type: 'UPDATE_SIMULATION_PARAMS', payload: params });
+            };
+
+
+            // =====================================================
+            // COMPONENT RENDER
+            // =====================================================
+
+return (
+                <SimulationContext.Provider value={{ state, dispatch }}>
+                    <div className="simulator-container">
+
+                        {/* Main Simulation Panel */}
+                        <div className="main-simulation">
+                            <canvas
+                                ref={canvasRef}
+                                className="simulation-canvas"
+                                // Event listeners are now added via useEffect
+                            />
+
+                            {/* Enhanced Energy Overlay */}
+                            <div className="energy-overlay">
+                                <div className="energy-title">System Dynamics</div>
+                                <div className="energy-value">
+                                    Kinetic: {(state.totalKineticEnergy / 1e15).toFixed(3)} PJ
+                                </div>
+                                <div className="energy-value">
+                                    Potential: {(state.totalPotentialEnergy / 1e15).toFixed(3)} PJ
+                                </div>
+                                <div className="energy-value">
+                                    Total: {((state.totalKineticEnergy + state.totalPotentialEnergy) / 1e15).toFixed(3)} PJ
+                                </div>
+                                <div className="energy-value">
+                                    Momentum: {Math.sqrt(state.totalMomentum.x ** 2 + state.totalMomentum.y ** 2).toFixed(2)} kg·m/s
+                                </div>
+                                <div className="energy-value">
+                                    CoM: ({state.centerOfMass.x.toFixed(1)}, {state.centerOfMass.y.toFixed(1)})
+                                </div>
+                            </div>
+
+                            {/* Performance Overlay */}
+                            <div style={{
+                                position: 'absolute',
+                                top: '30px',
+                                right: '30px',
+                                background: 'rgba(0, 0, 0, 0.85)',
+                                padding: '15px',
+                                borderRadius: '10px',
+                                border: '2px solid #4a90e2',
+                                backdropFilter: 'blur(10px)'
+                            }}>
+                                <div className="energy-title">Performance</div>
+                                <div className="energy-value">FPS: {performanceStats.fps}</div>
+                                <div className="energy-value">Objects: {performanceStats.objectCount}</div>
+                                <div className="energy-value">Fragments: {performanceStats.fragmentCount}</div>
+                            </div>
+                        </div>
+
+                        {/* Enhanced Control Panel */}
+                        <div className="control-panel">
+
+                            {/* Simulation Controls */}
+                            <div className="control-section">
+                                <div className="section-title">⚙️ Simulation Control</div>
+
+                                <button
+                                    className={`control-button ${isRunning ? 'button-danger' : 'button-success'}`}
+                                    onClick={toggleSimulation}
+                                >
+                                    {isRunning ? '⏸️ Pause' : '▶️ Start'} Simulation
+                                </button>
+
+                                <button
+                                    className="control-button button-danger"
+                                    onClick={clearSimulation}
+                                >
+                                    🗑️ Clear All
+                                </button>
+
+                                <div className="stats-grid">
+                                    <div className="stat-box">
+                                        <div className="stat-label">Objects</div>
+                                        <div className="stat-value">{performanceStats.objectCount}</div>
+                                    </div>
+                                    <div className="stat-box">
+                                        <div className="stat-label">Fragments</div>
+                                        <div className="stat-value">{performanceStats.fragmentCount}</div>
+                                    </div>
+                                    <div className="stat-box">
+                                        <div className="stat-label">FPS</div>
+                                        <div className="stat-value">{performanceStats.fps}</div>
+                                    </div>
+                                    <div className="stat-box">
+                                        <div className="stat-label">Energy</div>
+                                        <div className="stat-value">
+                                            {((state.totalKineticEnergy + state.totalPotentialEnergy) / 1e15).toFixed(1)} PJ
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Enhanced Simulation Presets */}
+                            <div className="control-section">
+                                <div className="section-title">🎯 Simulation Presets</div>
+                                {Object.keys(EnhancedSimulationPresets).map(presetName => (
+                                    <button
+                                        key={presetName}
+                                        className={`preset-button ${selectedPreset === presetName ? 'active' : ''}`}
+                                        onClick={() => loadPreset(presetName)}
+                                        title={`Load ${presetName} scenario`}
+                                    >
+                                        {presetName}
+                                    </button>
+                                ))}
+                            </div>
+
+                            {/* Advanced Object Creation */}
+                            <div className="control-section">
+                                <div className="section-title">🪨 Create Object</div>
+
+                                <div className="input-group">
+                                    <label className="input-label">Mass (×10¹² kg)</label>
+                                    <input
+                                        className="input-field"
+                                        type="number"
+                                        value={objectCreation.mass / 1e12}
+                                        onChange={(e) => setObjectCreation(prev => ({
+                                            ...prev,
+                                            mass: parseFloat(e.target.value) * 1e12
+                                        }))}
+                                        step="0.1"
+                                        min="0.1"
+                                        max="100"
+                                    />
+                                </div>
+
+                                <div className="input-group">
+                                    <label className="input-label">Radius (m)</label>
+                                    <input
+                                        className="input-field"
+                                        type="number"
+                                        value={objectCreation.radius}
+                                        onChange={(e) => {
+                                            const radius = parseFloat(e.target.value);
+                                            const volume = (4/3) * Math.PI * Math.pow(radius, 3);
+                                            const mass = objectCreation.density * volume;
+                                            setObjectCreation(prev => ({
+                                                ...prev,
+                                                radius: radius,
+                                                mass: mass
+                                            }));
+                                        }}
+                                        step="1"
+                                        min="1"
+                                        max="50"
+                                    />
+                                </div>
+
+                                <div className="input-group">
+                                    <label className="input-label">Material Type</label>
+                                    <select
+                                        className="material-select"
+                                        value={objectCreation.material}
+                                        onChange={(e) => {
+                                            const material = e.target.value;
+                                            const materialProps = MaterialProperties[material];
+                                            const volume = (4/3) * Math.PI * Math.pow(objectCreation.radius, 3);
+                                            setObjectCreation(prev => ({
+                                                ...prev,
+                                                material,
+                                                density: materialProps.density,
+                                                mass: materialProps.density * volume,
+                                                temperature: material === 'ice' ? 250 : 300
+                                            }));
+                                        }}
+                                    >
+                                        <option value="rock">🪨 Silicate Rock</option>
+                                        <option value="ice">🧊 Water Ice</option>
+                                        <option value="metal">⚙️ Iron-Nickel</option>
+                                        <option value="carbonaceous">⚫ Carbonaceous</option>
+                                    </select>
+                                </div>
+
+                                <div className="input-group">
+                                    <label className="input-label">Density (kg/m³)</label>
+                                    <input
+                                        className="input-field"
+                                        type="number"
+                                        value={objectCreation.density}
+                                        onChange={(e) => {
+                                            const density = parseFloat(e.target.value);
+                                            const volume = (4/3) * Math.PI * Math.pow(objectCreation.radius, 3);
+                                            setObjectCreation(prev => ({
+                                                ...prev,
+                                                density: density,
+                                                mass: density * volume
+                                            }));
+                                        }}
+                                        step="100"
+                                        min="100"
+                                        max="20000"
+                                    />
+                                </div>
+
+                                <div className="input-group">
+                                    <label className="input-label">Temperature (K)</label>
+                                    <input
+                                        className="input-field"
+                                        type="number"
+                                        value={objectCreation.temperature}
+                                        onChange={(e) => setObjectCreation(prev => ({
+                                            ...prev,
+                                            temperature: parseFloat(e.target.value)
+                                        }))}
+                                        step="10"
+                                        min="0"
+                                        max="2000"
+                                    />
+                                </div>
+
+                                <div className="creation-hint">
+                                    🖱️ Click and drag on canvas to create object with initial velocity vector
+                                </div>
+                            </div>
+
+                            {/* Advanced Physics Settings */}
+                            <div className="control-section">
+                                <div
+                                    className="section-title advanced-toggle"
+                                    onClick={() => setShowAdvanced(prev => !prev)}
+                                >
+                                    🔬 Advanced Physics
+                                    <span className={`toggle-icon ${showAdvanced ? 'expanded' : ''}`}>
+                                        {showAdvanced ? '▼' : '▶'}
+                                    </span>
+                                </div>
+
+                                {showAdvanced && (
+                                    <>
+                                        <div className="input-group">
+                                            <label className="input-label">Integration Time Step</label>
+                                            <input
+                                                className="input-field"
+                                                type="number"
+                                                value={state.simulationParams.timeStep}
+                                                onChange={(e) => updateSimulationParams({
+                                                    timeStep: parseFloat(e.target.value)
+                                                })}
+                                                step="0.001"
+                                                min="0.001"
+                                                max="0.1"
+                                            />
+                                        </div>
+
+                                        <div className="input-group">
+                                            <label className="input-label">Max Fragments</label>
+                                            <input
+                                                className="input-field"
+                                                type="number"
+                                                value={state.simulationParams.maxFragments}
+                                                onChange={(e) => updateSimulationParams({
+                                                    maxFragments: parseInt(e.target.value)
+                                                })}
+                                                step="25"
+                                                min="50"
+                                                max="1000"
+                                            />
+                                        </div>
+
+                                        <div className="input-group">
+                                            <label className="input-label">Fragment Lifetime (frames)</label>
+                                            <input
+                                                className="input-field"
+                                                type="number"
+                                                value={state.simulationParams.fragmentLifetime}
+                                                onChange={(e) => updateSimulationParams({
+                                                    fragmentLifetime: parseInt(e.target.value)
+                                                })}
+                                                step="100"
+                                                min="500"
+                                                max="5000"
+                                            />
+                                        </div>
+
+                                        <div className="checkbox-container">
+                                            <input
+                                                type="checkbox"
+                                                checked={state.simulationParams.showTrajectories}
+                                                onChange={(e) => updateSimulationParams({
+                                                    showTrajectories: e.target.checked
+                                                })}
+                                            />
+                                            <label>🛸 Show Orbital Trajectories</label>
+                                        </div>
+
+                                        <div className="checkbox-container">
+                                            <input
+                                                type="checkbox"
+                                                checked={state.simulationParams.showVelocityVectors}
+                                                onChange={(e) => updateSimulationParams({
+                                                    showVelocityVectors: e.target.checked
+                                                })}
+                                            />
+                                            <label>➡️ Show Velocity Vectors</label>
+                                        </div>
+
+                                        <div className="checkbox-container">
+                                            <input
+                                                type="checkbox"
+                                                checked={state.simulationParams.showGravitationalField}
+                                                onChange={(e) => updateSimulationParams({
+                                                    showGravitationalField: e.target.checked
+                                                })}
+                                            />
+                                            <label>🌍 Show Gravitational Field</label>
+                                        </div>
+
+                                        <div className="checkbox-container">
+                                            <input
+                                                type="checkbox"
+                                                checked={state.simulationParams.showThermalEffects}
+                                                onChange={(e) => updateSimulationParams({
+                                                    showThermalEffects: e.target.checked
+                                                })}
+                                            />
+                                            <label>🔥 Show Thermal Effects</label>
+                                        </div>
+
+                                        <div className="checkbox-container">
+                                            <input
+                                                type="checkbox"
+                                                checked={state.simulationParams.realtimePhysics}
+                                                onChange={(e) => updateSimulationParams({
+                                                    realtimePhysics: e.target.checked
+                                                })}
+                                            />
+                                            <label>⚡ Real-time Physics</label>
+                                        </div>
+                                    </>
+                                )}
+                            </div>
+
+                            {/* Enhanced Collision Events Log */}
+                            <div className="control-section">
+                                <div className="section-title">💥 Collision Events</div>
+                                <div className="collision-log">
+                                    {state.collisionEvents.length === 0 ? (
+                                        <div className="log-entry">
+                                            🚀 No collisions detected yet...<br/>
+                                            <small>Create objects and let them interact!</small>
+                                        </div>
+                                    ) : (
+                                        state.collisionEvents.slice(0, 15).map((event, index) => {
+                                            const eventNumber = state.collisionEvents.length - index;
+                                            const impactData = event.impactData;
+                                            const catastrophic = event.fragments.length > 50;
+
+                                            return (
+                                                <div key={event.id} className="log-entry">
+                                                    <strong>
+                                                        {catastrophic ? '💥' : '🔥'} Collision #{eventNumber}
+                                                        {catastrophic && ' (Catastrophic)'}
+                                                    </strong><br/>
+                                                    <small>
+                                                        Impact: {impactData.impactVelocity.toFixed(1)} m/s<br/>
+                                                        Energy: {(impactData.kineticEnergy / 1e15).toFixed(3)} PJ<br/>
+                                                        Fragments: {event.fragments.length}<br/>
+                                                        Largest: {Math.max(...event.fragments.map(f => f.mass / 1e12)).toFixed(2)}T<br/>
+                                                        <span style={{ color: '#74b9ff' }}>
+                                                            {new Date(event.timestamp).toLocaleTimeString()}
+                                                        </span>
+                                                    </small>
+                                                </div>
+                                            );
+                                        })
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* System Information Panel */}
+                            <div className="control-section">
+                                <div className="section-title">📊 System Information</div>
+
+                                <div style={{ fontSize: '11px', lineHeight: '1.4', color: '#b0b0b0' }}>
+                                    <div style={{ marginBottom: '8px' }}>
+                                        <strong>Conservation Laws:</strong><br/>
+                                        Energy: {(((state.totalKineticEnergy + state.totalPotentialEnergy) / 1e15) || 0).toFixed(3)} PJ<br/>
+                                        Momentum: {(Math.sqrt((state.totalMomentum?.x || 0) ** 2 + (state.totalMomentum?.y || 0) ** 2) || 0).toFixed(2)} kg·m/s
+                                    </div>
+
+                                    <div style={{ marginBottom: '8px' }}>
+                                        <strong>Fragment Distribution:</strong><br/>
+                                        {state.objects.filter(obj => obj.isFragment).length > 0 ? (
+                                            <>
+                                                Remnants: {state.objects.filter(obj => obj.fragmentType === 'remnant').length}<br/>
+                                                Large: {state.objects.filter(obj => obj.fragmentType === 'large').length}<br/>
+                                                Medium: {state.objects.filter(obj => obj.fragmentType === 'medium').length}<br/>
+                                                Small: {state.objects.filter(obj => obj.fragmentType === 'small').length}<br/>
+                                                Debris: {state.objects.filter(obj => obj.fragmentType === 'debris').length}<br/>
+                                                Vapor: {state.objects.filter(obj => obj.fragmentType === 'vapor').length}
+                                            </>
+                                        ) : (
+                                            'No fragments present'
+                                        )}
+                                    </div>
+
+                                    <div>
+                                        <strong>Physics Engine:</strong><br/>
+                                        Advanced Procedural Fragmentation<br/>
+                                        Voronoi Stress Propagation<br/>
+                                        Multi-Material Dynamics<br/>
+                                        Thermal Evolution<br/>
+                                        N-Body Gravitational Simulation
+                                    </div>
+                                </div>
+                            </div>
+
+                        </div>
+                    </div>
+                </SimulationContext.Provider>
+            );
+        };
+
+        // =====================================================
+        // APPLICATION INITIALIZATION
+        // =====================================================
+
+        // Initialize and render the application
+        const App = () => {
+            return React.createElement(AdvancedGravitationalCollisionSimulator);
+        };
+
+        // Render the application to the DOM
+        ReactDOM.render(React.createElement(App), document.getElementById('root'));
+
+        // Add additional keyboard shortcuts
+        document.addEventListener('keydown', (e) => {
+            switch(e.key) {
+                case ' ':
+                    e.preventDefault();
+                    // Toggle simulation (space bar)
+                    const event = new CustomEvent('toggleSimulation');
+                    document.dispatchEvent(event);
+                    break;
+                case 'c':
+                    if (e.ctrlKey) {
+                        e.preventDefault();
+                        // Clear simulation (Ctrl+C)
+                        const clearEvent = new CustomEvent('clearSimulation');
+                        document.dispatchEvent(clearEvent);
+                    }
+                    break;
+                case 'r':
+                    if (e.ctrlKey) {
+                        e.preventDefault();
+                        // Reset to default preset (Ctrl+R)
+                        const resetEvent = new CustomEvent('resetSimulation');
+                        document.dispatchEvent(resetEvent);
+                    }
+                    break;
+            }
+        });
+
+        // Performance monitoring
+        setInterval(() => {
+            if (window.performance && window.performance.memory) {
+                const memory = window.performance.memory;
+                console.log(`Memory Usage - Used: ${(memory.usedJSHeapSize / 1048576).toFixed(2)} MB, Total: ${(memory.totalJSHeapSize / 1048576).toFixed(2)} MB`);
+            }
+        }, 5000);
+
+        // Welcome message
+        console.log(`
+🌌 Advanced Gravitational Collision Simulator Initialized 🌌
+
+Features:
+- ⚗️  Advanced Procedural Fragmentation Engine
+- 🌍  N-Body Gravitational Dynamics
+- 🔥  Thermal Evolution & Material Physics
+- 💥  Voronoi Stress Propagation
+- 🎯  Multiple Material Types (Rock, Ice, Metal, Carbonaceous)
+- 📊  Real-time Energy & Momentum Conservation
+- 🎮  Interactive Object Creation
+- 🚀  High-Performance Fragment Simulation
+
+Controls:
+- 🖱️  Click & Drag: Create objects with velocity
+- ⌨️  Space: Toggle simulation
+- ⌨️  Ctrl+C: Clear simulation
+- ⌨️  Ctrl+R: Reset to defaults
+
+Ready for scientific exploration! 🚀
+        `);
+
+    </script>
+</body>
+</html>
