@@ -481,12 +481,17 @@
             }
 
             static calculateStressPropagation(impactPoint, objectRadius, material, impactEnergy) {
+                if (objectRadius === 0) { console.warn('objectRadius is zero in calculateStressPropagation.'); return []; }
+                if (!material.density || material.density === 0) { console.warn('Material density is zero, cannot calculate stress waves.'); return []; }
+                if (!material.strength || material.strength === 0) { console.warn('Material strength is zero, cannot calculate stress waves meaningfully.'); return []; }
+
                 const stressWaves = [];
                 const waveSpeed = Math.sqrt(material.strength / material.density);
                 const maxWaves = 8;
 
                 for (let i = 0; i < maxWaves; i++) {
                     const waveRadius = (i + 1) * objectRadius * 0.2;
+                    if (waveRadius === 0) { console.warn('waveRadius is zero, skipping wave strength calculation.'); continue; }
                     const waveStrength = impactEnergy / (4 * Math.PI * waveRadius * waveRadius);
                     const dampingFactor = Math.exp(-i * 0.3);
 
@@ -527,9 +532,14 @@
                 // Secondary concentric fractures
                 stressWaves.forEach((wave, index) => {
                     if (wave.strength > material.strength * 0.1) {
+                        if (!material.strength || material.strength === 0) { console.warn('Material strength is zero in generateFractureLines, skipping concentric fractures for this wave.'); return; }
+                        if (!isFinite(wave.strength) || wave.strength < 0) { console.warn('Invalid wave.strength, skipping concentric fractures.'); return; }
                         const numConcentric = Math.floor(wave.strength / material.strength * 6);
+                        const MAX_CONCENTRIC_FRACTURES_PER_WAVE = 50; // Sanity cap
+                        let effectiveNumConcentric = Math.min(numConcentric, MAX_CONCENTRIC_FRACTURES_PER_WAVE);
+                        if (!isFinite(effectiveNumConcentric) || effectiveNumConcentric < 0) effectiveNumConcentric = 0;
 
-                        for (let i = 0; i < numConcentric; i++) {
+                        for (let i = 0; i < effectiveNumConcentric; i++) {
                             const startAngle = Math.random() * 2 * Math.PI;
                             const arcLength = Math.PI * 0.3 + Math.random() * Math.PI * 0.4;
                             const radius = wave.radius * (0.8 + Math.random() * 0.4);
@@ -600,10 +610,11 @@
                 const { impactVelocity, impactAngle, kineticEnergy } = impactData;
 
                 // Calculate fragment size distribution using power law
-                const numFragments = Math.min(
+                let numFragments = Math.min(
                     Math.floor(10 + fractureLines.length * 2 + (kineticEnergy / 1e15) * 5),
                     150
                 );
+                if (!isFinite(numFragments) || numFragments <= 0) { console.warn('Invalid numFragments calculated, defaulting to 10.'); numFragments = 10; }
 
                 const fragments_masses = this.generatePowerLawDistribution(totalMass, numFragments, -2.5);
                 const centerOfMass = this.calculateCenterOfMass(target, projectile);
@@ -627,6 +638,7 @@
             }
 
             static generatePowerLawDistribution(totalMass, numFragments, exponent) {
+                if (numFragments <= 0) { console.warn('numFragments is <=0 in generatePowerLawDistribution, returning empty array.'); return []; }
                 const masses = [];
                 let totalGenerated = 0;
 
@@ -638,6 +650,7 @@
                 }
 
                 // Normalize to total mass
+                if (totalGenerated === 0) { console.warn('totalGenerated is zero in generatePowerLawDistribution, cannot normalize masses.'); return masses.map(m => totalMass / numFragments * 0.95); /* Distribute mass somewhat evenly as a fallback */ }
                 return masses.map(mass => (mass / totalGenerated) * totalMass * 0.95); // 5% lost to vapor
             }
 
@@ -645,9 +658,11 @@
                                         impactVelocity, centerOfMass, impactAngle,
                                         material, fractureLines, kineticEnergy) {
 
+                if (!mass || mass <= 0) { console.warn('Fragment mass is zero or negative, cannot create fragment.'); return null; }
                 if (mass < target.mass * 1e-6) return null; // Too small to track
 
                 const density = material.density * (0.7 + Math.random() * 0.6); // Density variation due to porosity
+                if (!density || density === 0) { console.warn('Fragment density is zero, cannot calculate radius.'); return null; }
                 const radius = Math.pow(3 * mass / (4 * Math.PI * density), 1/3);
 
                 // Fragment position distribution
@@ -750,10 +765,14 @@
 
             static addSpallFragments(fragments, target, projectile, impactData, material) {
                 // High-velocity spall fragments from impact shock
+                if (!isFinite(impactData.kineticEnergy)) { console.warn('kineticEnergy is not finite in addSpallFragments.'); return; }
                 const numSpall = Math.floor(impactData.kineticEnergy / 1e16);
 
                 for (let i = 0; i < Math.min(numSpall, 20); i++) {
                     const spallMass = target.mass * (1e-5 + Math.random() * 1e-4);
+                    if (!spallMass || spallMass <= 0) { console.warn('Spall fragment mass is zero or negative, cannot create fragment.'); continue; }
+                    const spallDensity = material.density * 1.2;
+                    if (!spallDensity || spallDensity === 0) { console.warn('Spall fragment density is zero, cannot calculate radius.'); continue; }
                     const spallSpeed = impactData.impactVelocity * (2 + Math.random() * 3);
                     const angle = impactData.impactAngle + (Math.random() - 0.5) * Math.PI * 0.3;
 
@@ -762,8 +781,8 @@
                     fragments.push({
                         id: Date.now() + Math.random(),
                         mass: spallMass,
-                        radius: Math.pow(3 * spallMass / (4 * Math.PI * material.density), 1/3),
-                        density: material.density * 1.2, // Compressed spall
+                        radius: Math.pow(3 * spallMass / (4 * Math.PI * spallDensity), 1/3),
+                        density: spallDensity, // Compressed spall
                         material: target.material,
                         position: {
                             x: centerOfMass.x + target.radius * Math.cos(angle),
@@ -788,11 +807,15 @@
 
             static addMeltDroplets(fragments, target, projectile, impactData, material) {
                 if (impactData.kineticEnergy < material.strength * target.mass) return;
+                if (!material.strength || material.strength === 0) { console.warn('Material strength is zero in addMeltDroplets.'); return; }
 
                 const numDroplets = Math.floor(impactData.kineticEnergy / (material.strength * 1e12));
 
                 for (let i = 0; i < Math.min(numDroplets, 30); i++) {
                     const dropletMass = target.mass * (1e-6 + Math.random() * 1e-5);
+                    if (!dropletMass || dropletMass <= 0) { console.warn('Melt droplet mass is zero or negative, cannot create fragment.'); continue; }
+                    const dropletDensity = material.density * 0.8;
+                    if (!dropletDensity || dropletDensity === 0) { console.warn('Melt droplet density is zero, cannot calculate radius.'); continue; }
                     const dropletSpeed = impactData.impactVelocity * (0.5 + Math.random() * 1.5);
                     const angle = Math.random() * 2 * Math.PI;
 
@@ -801,8 +824,8 @@
                     fragments.push({
                         id: Date.now() + Math.random(),
                         mass: dropletMass,
-                        radius: Math.pow(3 * dropletMass / (4 * Math.PI * material.density * 0.8), 1/3),
-                        density: material.density * 0.8, // Liquid density
+                        radius: Math.pow(3 * dropletMass / (4 * Math.PI * dropletDensity), 1/3),
+                        density: dropletDensity, // Liquid density
                         material: target.material,
                         position: {
                             x: centerOfMass.x + (Math.random() - 0.5) * target.radius,
@@ -828,14 +851,21 @@
 
             static addVaporCloud(fragments, target, projectile, impactData, material) {
                 if (impactData.kineticEnergy < material.strength * target.mass * 10) return;
+                if (!material.strength || material.strength === 0) { console.warn('Material strength is zero in addVaporCloud.'); return; } // Added strength check
+                if (!target.mass || target.mass === 0) { console.warn('Target mass is zero in addVaporCloud.'); return; } // Added target mass check
 
                 const vaporMass = (target.mass + projectile.mass) * 0.05 *
                                 (impactData.kineticEnergy / (material.strength * target.mass * 10));
+                if (!isFinite(vaporMass) || vaporMass <= 0) { console.warn('Cannot create vapor cloud with zero or non-finite mass.'); return; }
+
 
                 const numVaporParticles = Math.min(Math.floor(vaporMass / (target.mass * 1e-8)), 50);
 
                 for (let i = 0; i < numVaporParticles; i++) {
                     const particleMass = vaporMass / numVaporParticles;
+                    if (!particleMass || particleMass <= 0) { console.warn('Vapor particle mass is zero or negative, cannot create fragment.'); continue; }
+                    const vaporDensity = material.density * 0.001;
+                    if (!vaporDensity || vaporDensity === 0) { console.warn('Vapor particle density is zero, cannot calculate radius.'); continue; }
                     const vaporSpeed = impactData.impactVelocity * (3 + Math.random() * 5);
                     const angle = Math.random() * 2 * Math.PI;
 
@@ -844,8 +874,8 @@
                     fragments.push({
                         id: Date.now() + Math.random(),
                         mass: particleMass,
-                        radius: Math.pow(3 * particleMass / (4 * Math.PI * material.density * 0.001), 1/3),
-                        density: material.density * 0.001, // Vapor density
+                        radius: Math.pow(3 * particleMass / (4 * Math.PI * vaporDensity), 1/3),
+                        density: vaporDensity, // Vapor density
                         material: target.material,
                         position: {
                             x: centerOfMass.x + (Math.random() - 0.5) * target.radius * 0.5,
@@ -1631,6 +1661,11 @@
         // MAIN SIMULATION COMPONENT
         // =====================================================
 
+        // Define camera constants at a scope accessible to interaction handlers
+        const DEFAULT_ZOOM = 1.5;
+        const WORLD_VIEW_CENTER_X = 400;
+        const WORLD_VIEW_CENTER_Y = 300;
+
         const AdvancedGravitationalCollisionSimulator = () => {
             // State Management
             const [state, dispatch] = useReducer(simulationReducer, {
@@ -1907,9 +1942,10 @@
                 const height = canvas.height; // Use these for rendering logic
 
                 // Default camera parameters
-                const defaultZoom = 1.5; // Initial zoom factor
-                const worldViewCenterX = 400; // World X coordinate to center on
-                const worldViewCenterY = 300; // World Y coordinate to center on
+                // Default camera parameters are now defined outside this function
+                // const defaultZoom = 1.5; // Initial zoom factor
+                // const worldViewCenterX = 400; // World X coordinate to center on
+                // const worldViewCenterY = 300; // World Y coordinate to center on
 
                 // Clear canvas
                 ctx.fillStyle = '#000000';
@@ -1918,8 +1954,8 @@
                 // Apply camera transformations
                 ctx.save();
                 ctx.translate(width / 2, height / 2); // Move canvas origin to its center
-                ctx.scale(defaultZoom, defaultZoom); // Apply zoom
-                ctx.translate(-worldViewCenterX, -worldViewCenterY); // Pan world to center
+                ctx.scale(DEFAULT_ZOOM, DEFAULT_ZOOM); // Apply zoom
+                ctx.translate(-WORLD_VIEW_CENTER_X, -WORLD_VIEW_CENTER_Y); // Pan world to center
 
                 // Render star field
                 AdvancedRenderingEngine.renderStarField(ctx, width, height); // Stars might need adjustment if they are parallaxed
@@ -2054,20 +2090,32 @@
             // =====================================================
 
             const handleInteractionStart = (clientX, clientY) => {
-                const rect = canvasRef.current.getBoundingClientRect();
-                const x = clientX - rect.left;
-                const y = clientY - rect.top;
+                const canvas = canvasRef.current;
+                if (!canvas) return;
+                const rect = canvas.getBoundingClientRect();
+                const rawX = clientX - rect.left;
+                const rawY = clientY - rect.top;
+
+                // Transform to world coordinates
+                const worldX = (rawX - canvas.width / 2) / DEFAULT_ZOOM + WORLD_VIEW_CENTER_X;
+                const worldY = (rawY - canvas.height / 2) / DEFAULT_ZOOM + WORLD_VIEW_CENTER_Y;
 
                 isCreatingObject.current = true;
-                creationStart.current = { x, y };
-                mousePos.current = { x, y };
+                creationStart.current = { x: worldX, y: worldY };
+                mousePos.current = { x: worldX, y: worldY };
             };
 
             const handleInteractionMove = (clientX, clientY) => {
-                const rect = canvasRef.current.getBoundingClientRect();
+                const canvas = canvasRef.current;
+                if (!canvas) return;
+                const rect = canvas.getBoundingClientRect();
+                const rawX = clientX - rect.left;
+                const rawY = clientY - rect.top;
+
+                // Transform to world coordinates
                 mousePos.current = {
-                    x: clientX - rect.left,
-                    y: clientY - rect.top
+                    x: (rawX - canvas.width / 2) / DEFAULT_ZOOM + WORLD_VIEW_CENTER_X,
+                    y: (rawY - canvas.height / 2) / DEFAULT_ZOOM + WORLD_VIEW_CENTER_Y
                 };
 
                 if (isCreatingObject.current && !isRunning) {
@@ -2078,6 +2126,7 @@
             const handleInteractionEnd = () => {
                 if (!isCreatingObject.current) return;
 
+                // dx, dy are now differences in world coordinates, which is good for velocity calculation
                 const dx = mousePos.current.x - creationStart.current.x;
                 const dy = mousePos.current.y - creationStart.current.y;
 
@@ -2086,8 +2135,8 @@
                     radius: objectCreation.radius,
                     density: objectCreation.density,
                     material: objectCreation.material,
-                    position: { ...creationStart.current },
-                    velocity: { x: dx * 0.4, y: dy * 0.4 },
+                    position: { ...creationStart.current }, // Already in world coordinates
+                    velocity: { x: dx * 0.4, y: dy * 0.4 }, // Velocity based on world coord delta
                     acceleration: { x: 0, y: 0 },
                     isFragment: false,
                     temperature: objectCreation.temperature,
