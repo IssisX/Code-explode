@@ -424,6 +424,8 @@
             SPECIFIC_HEAT_METAL: 500
         };
 
+        const MAX_FRAGMENT_GENERATION = 2; // Max depth for secondary fragmentation
+
         const MaterialProperties = {
             rock: {
                 density: PhysicsConstants.DENSITY_ROCK,
@@ -481,7 +483,7 @@
             }
 
             static calculateStressPropagation(impactPoint, objectRadius, material, impactEnergy) {
-                console.log(`[PF Engine] calculateStressPropagation: impactEnergy=${impactEnergy.toExponential(2)}, objectRadius=${objectRadius}, materialDensity=${material.density}, materialStrength=${material.strength}`);
+                console.log('[PF Engine] calculateStressPropagation initiated'); // Simplified log
                 if (objectRadius === 0) { console.warn('objectRadius is zero in calculateStressPropagation.'); return []; }
                 if (!material.density || material.density === 0) { console.warn('Material density is zero, cannot calculate stress waves.'); return []; }
                 if (!material.strength || material.strength === 0) { console.warn('Material strength is zero, cannot calculate stress waves meaningfully.'); return []; }
@@ -502,12 +504,12 @@
                         propagationTime: waveRadius / waveSpeed
                     });
                 }
-                console.log('[PF Engine] calculateStressPropagation: Completed, stressWaves count:', stressWaves.length);
+                // console.log('[PF Engine] calculateStressPropagation: Completed, stressWaves count:', stressWaves.length); // Removed exit log
                 return stressWaves;
             }
 
             static generateFractureLines(impactPoint, objectRadius, material, stressWaves) {
-                console.log(`[PF Engine] generateFractureLines: stressWaves.length=${stressWaves.length}, objectRadius=${objectRadius}`);
+                console.log(`[PF Engine] generateFractureLines initiated: stressWaves.length=${stressWaves.length}, objectRadius=${objectRadius}`); // Simplified entry
                 const fractureLines = [];
                 const numPrimaryFractures = Math.floor(4 + Math.random() * 6);
 
@@ -533,15 +535,15 @@
 
                 // Secondary concentric fractures
                 stressWaves.forEach((wave, index) => {
-                    console.log(`[PF Engine] generateFractureLines wave ${index}: strength=${wave.strength.toExponential(2)}, radius=${wave.radius}`);
+                    // console.log(`[PF Engine] generateFractureLines wave ${index}: strength=${wave.strength.toExponential(2)}, radius=${wave.radius}`); // Removed per-wave log
                     if (wave.strength > material.strength * 0.1) {
                         if (!material.strength || material.strength === 0) { console.warn('Material strength is zero in generateFractureLines, skipping concentric fractures for this wave.'); return; }
                         if (!isFinite(wave.strength) || wave.strength < 0) { console.warn('Invalid wave.strength, skipping concentric fractures.'); return; }
                         const numConcentric = Math.floor(wave.strength / material.strength * 6);
-                        const MAX_CONCENTRIC_FRACTURES_PER_WAVE = 20; // Sanity cap
+                        const MAX_CONCENTRIC_FRACTURES_PER_WAVE = 10; // Further Sanity cap
                         let effectiveNumConcentric = Math.min(numConcentric, MAX_CONCENTRIC_FRACTURES_PER_WAVE);
                         if (!isFinite(effectiveNumConcentric) || effectiveNumConcentric < 0) effectiveNumConcentric = 0;
-                        console.log(`[PF Engine] generateFractureLines: effectiveNumConcentric=${effectiveNumConcentric} for wave ${index}`);
+                        // console.log(`[PF Engine] generateFractureLines: effectiveNumConcentric=${effectiveNumConcentric} for wave ${index}`); // Removed per-wave effectiveNumConcentric log
                         for (let i = 0; i < effectiveNumConcentric; i++) {
                             const startAngle = Math.random() * 2 * Math.PI;
                             const arcLength = Math.PI * 0.3 + Math.random() * Math.PI * 0.4;
@@ -608,17 +610,15 @@
 
             static createFragmentsFromFractures(target, projectile, fractureLines, impactData) {
                 console.log(`[PF Engine] createFragmentsFromFractures: KE=${impactData.kineticEnergy.toExponential(2)}, fractureLines=${fractureLines.length}, targetMass=${target.mass.toExponential(2)}, projectileMass=${projectile.mass.toExponential(2)}`);
-                // console.log(`[PF Engine] createFragmentsFromFractures: kineticEnergy=${impactData.kineticEnergy}, fractureLines.length=${fractureLines.length}`); // Original log kept for reference if needed
                 const fragments = [];
                 const material = MaterialProperties[target.material] || MaterialProperties.rock;
                 const totalMass = target.mass + projectile.mass;
                 const { impactVelocity, impactAngle, kineticEnergy } = impactData;
 
                 // Calculate fragment size distribution using power law
-                let numFragments = Math.min(Math.floor(5 + fractureLines.length * 1.0 + (kineticEnergy / 1e16) * 2.0), 50); // Reduced base, multipliers, and overall cap significantly
+                let numFragments = Math.min(Math.floor(5 + fractureLines.length * 0.5 + (kineticEnergy / 1e17) * 1.0), 25); // Further reduced multipliers and cap
                 if (!isFinite(numFragments) || numFragments <= 0) { console.warn('Invalid numFragments calculated, defaulting to 10.'); numFragments = 10; }
-                // console.log(`[PF Engine] createFragmentsFromFractures: numFragments=${numFragments}`); // Original log
-                console.log(`[PF Engine] createFragmentsFromFractures: Calculated numFragments=${numFragments}`);
+                console.log(`[PF Engine] createFragmentsFromFractures: Final numFragments cap applied: ${numFragments}`); // Log final capped value
                 const fragments_masses = this.generatePowerLawDistribution(totalMass, numFragments, -2.5);
                 const centerOfMass = this.calculateCenterOfMass(target, projectile);
 
@@ -641,8 +641,7 @@
             }
 
             static generatePowerLawDistribution(totalMass, numFragments, exponent) {
-                console.log(`[PF Engine] generatePowerLawDistribution: totalMass=${totalMass.toExponential(2)}, numFragments=${numFragments}`);
-                // console.log(`[PF Engine] generatePowerLawDistribution: totalMass=${totalMass}, numFragments=${numFragments}`); // Original log
+                // console.log(`[PF Engine] generatePowerLawDistribution: totalMass=${totalMass.toExponential(2)}, numFragments=${numFragments}`); // Removed log
                 if (numFragments <= 0) { console.warn('numFragments is <=0 in generatePowerLawDistribution, returning empty array.'); return []; }
                 const masses = [];
                 let totalGenerated = 0;
@@ -656,14 +655,14 @@
 
                 // Normalize to total mass
                 if (totalGenerated === 0) { console.warn('totalGenerated is zero in generatePowerLawDistribution, cannot normalize masses.'); return masses.map(m => totalMass / numFragments * 0.95); /* Distribute mass somewhat evenly as a fallback */ }
-                console.log('[PF Engine] generatePowerLawDistribution: Completed'); // This is the existing completed log, the new one is above.
+                // console.log('[PF Engine] generatePowerLawDistribution: Completed'); // Removed log
                 return masses.map(mass => (mass / totalGenerated) * totalMass * 0.95); // 5% lost to vapor
             }
 
             static createDetailedFragment(target, projectile, mass, index, totalFragments,
                                         impactVelocity, centerOfMass, impactAngle,
                                         material, fractureLines, kineticEnergy) {
-                console.log(`[PF Engine] createDetailedFragment: mass=${mass.toExponential(2)}, materialDensity=${material.density}, KE=${kineticEnergy.toExponential(2)}`);
+                // console.log(`[PF Engine] createDetailedFragment: mass=${mass.toExponential(2)}, materialDensity=${material.density}, KE=${kineticEnergy.toExponential(2)}`); // Removed entry log
                 if (!mass || mass <= 0) { console.warn('Fragment mass is zero or negative, cannot create fragment.'); return null; }
                 if (mass < target.mass * 1e-6) return null; // Too small to track
 
@@ -740,12 +739,14 @@
                     porosity: Math.random() * 0.3,
                     structuralIntegrity: 0.1 + Math.random() * 0.9,
                     sublimationRate: material.cohesion * 1e-8,
-                    magneticMoment: target.material === 'metal' ? Math.random() * 1e-6 : 0
+                    magneticMoment: target.material === 'metal' ? Math.random() * 1e-6 : 0,
+                    originalMass: target.mass, // Store original mass of parent body
+                    generation: 0 // Initial generation
                 };
             }
 
             static calculateStressInfluence(fragmentIndex, fractureLines) {
-                console.log(`[PF Engine] calculateStressInfluence: fractureLines.length=${fractureLines.length}`);
+                // console.log(`[PF Engine] calculateStressInfluence: fractureLines.length=${fractureLines.length}`); // Removed entry log
                 let influence = 0;
                 const position = fragmentIndex / fractureLines.length;
 
@@ -771,12 +772,12 @@
             }
 
             static addSpallFragments(fragments, target, projectile, impactData, material) {
-                console.log('[PF Engine] addSpallFragments called');
+                // console.log('[PF Engine] addSpallFragments called'); // Removed log
                 // High-velocity spall fragments from impact shock
                 if (!isFinite(impactData.kineticEnergy)) { console.warn('kineticEnergy is not finite in addSpallFragments.'); return; }
                 const numSpall = Math.floor(impactData.kineticEnergy / 1e16);
                 const cappedNumSpall = Math.min(numSpall, 20);
-                console.log(`[PF Engine] addSpallFragments: calculated numSpall=${numSpall}, capped at ${cappedNumSpall}`);
+                // console.log(`[PF Engine] addSpallFragments: calculated numSpall=${numSpall}, capped at ${cappedNumSpall}`); // Removed log
 
                 for (let i = 0; i < cappedNumSpall; i++) {
                     const spallMass = target.mass * (1e-5 + Math.random() * 1e-4);
@@ -810,20 +811,22 @@
                         brightness: 0.8 + Math.random() * 0.2,
                         aspectRatio: 2 + Math.random() * 3, // Elongated spall
                         angularVelocity: (Math.random() - 0.5) * 2,
-                        orientation: Math.random() * 2 * Math.PI
+                        orientation: Math.random() * 2 * Math.PI,
+                        originalMass: target.mass,
+                        generation: 0
                     });
                 }
-                console.log('[PF Engine] addSpallFragments completed');
+                // console.log('[PF Engine] addSpallFragments completed'); // Removed log
             }
 
             static addMeltDroplets(fragments, target, projectile, impactData, material) {
-                console.log('[PF Engine] addMeltDroplets called');
+                // console.log('[PF Engine] addMeltDroplets called'); // Removed log
                 if (impactData.kineticEnergy < material.strength * target.mass) return;
                 if (!material.strength || material.strength === 0) { console.warn('Material strength is zero in addMeltDroplets.'); return; }
 
                 const numDroplets = Math.floor(impactData.kineticEnergy / (material.strength * 1e12));
                 const cappedNumDroplets = Math.min(numDroplets, 30);
-                console.log(`[PF Engine] addMeltDroplets: calculated numDroplets=${numDroplets}, capped at ${cappedNumDroplets}`);
+                // console.log(`[PF Engine] addMeltDroplets: calculated numDroplets=${numDroplets}, capped at ${cappedNumDroplets}`); // Removed log
 
                 for (let i = 0; i < cappedNumDroplets; i++) {
                     const dropletMass = target.mass * (1e-6 + Math.random() * 1e-5);
@@ -858,14 +861,16 @@
                         aspectRatio: 0.8 + Math.random() * 0.4, // Nearly spherical droplets
                         angularVelocity: (Math.random() - 0.5) * 0.1,
                         orientation: Math.random() * 2 * Math.PI,
-                        coolingRate: 1e-3
+                        coolingRate: 1e-3,
+                        originalMass: target.mass,
+                        generation: 0
                     });
                 }
-                console.log('[PF Engine] addMeltDroplets completed');
+                // console.log('[PF Engine] addMeltDroplets completed'); // Removed log
             }
 
             static addVaporCloud(fragments, target, projectile, impactData, material) {
-                console.log('[PF Engine] addVaporCloud called');
+                // console.log('[PF Engine] addVaporCloud called'); // Removed log
                 if (impactData.kineticEnergy < material.strength * target.mass * 10) return;
                 if (!material.strength || material.strength === 0) { console.warn('Material strength is zero in addVaporCloud.'); return; } // Added strength check
                 if (!target.mass || target.mass === 0) { console.warn('Target mass is zero in addVaporCloud.'); return; } // Added target mass check
@@ -876,7 +881,7 @@
 
                 const calculatedNumVaporParticles = Math.floor(vaporMass / (target.mass * 1e-8));
                 const numVaporParticles = Math.min(calculatedNumVaporParticles, 50);
-                console.log(`[PF Engine] addVaporCloud: calculated numVaporParticles=${calculatedNumVaporParticles}, capped at ${numVaporParticles}`);
+                // console.log(`[PF Engine] addVaporCloud: calculated numVaporParticles=${calculatedNumVaporParticles}, capped at ${numVaporParticles}`); // Removed log
 
                 for (let i = 0; i < numVaporParticles; i++) {
                     const particleMass = vaporMass / numVaporParticles;
@@ -912,10 +917,12 @@
                         angularVelocity: (Math.random() - 0.5) * 1.0,
                         orientation: Math.random() * 2 * Math.PI,
                         expansionRate: 1e-2,
-                        opacity: 0.3 + Math.random() * 0.4
+                        opacity: 0.3 + Math.random() * 0.4,
+                        originalMass: target.mass,
+                        generation: 0
                     });
                 }
-                console.log('[PF Engine] addVaporCloud completed');
+                // console.log('[PF Engine] addVaporCloud completed'); // Removed log
             }
 
             static calculateCenterOfMass(object1, object2) {
@@ -1067,6 +1074,14 @@
 
                 // Structural integrity degradation
                 if (fragment.structuralIntegrity < 0.3 && fragment.age > 50) {
+                    // Recursion / performance safeguards for secondary fragmentation
+                    if (fragment.generation >= MAX_FRAGMENT_GENERATION) return null;
+                    // Ensure originalMass is defined, fallback to fragment.mass * 0.1 (a fraction of current mass if original is missing)
+                    // and then check if current mass is less than a small fraction (1e-2) of that.
+                    const baseMassForThreshold = fragment.originalMass || (fragment.mass * 0.1);
+                    if (fragment.mass < baseMassForThreshold * 1e-2) return null;
+
+
                     // Fragment may break apart further
                     return this.secondaryFragmentation(fragment);
                 }
@@ -1075,7 +1090,11 @@
             }
 
             static secondaryFragmentation(fragment) {
-                if (fragment.mass < fragment.originalMass * 0.001) return null;
+                // if (fragment.mass < fragment.originalMass * 0.001) return null; // Original check
+                // More robust check, using originalMass if available, or a fraction of current mass.
+                const baseMassForThreshold = fragment.originalMass || fragment.mass;
+                if (fragment.mass < baseMassForThreshold * 0.001) return null;
+
 
                 const numSubFragments = 2 + Math.floor(Math.random() * 3);
                 const subFragments = [];
@@ -1102,7 +1121,9 @@
                         },
                         age: 0,
                         fragmentType: 'secondary',
-                        structuralIntegrity: Math.random() * 0.5
+                        structuralIntegrity: Math.random() * 0.5,
+                        originalMass: fragment.originalMass || fragment.mass, // Propagate originalMass
+                        generation: fragment.generation + 1 // Increment generation
                     });
                 }
 
@@ -1839,7 +1860,7 @@
                     const fragmentsToAdd = [];
 
                     collisions.forEach(collision => {
-                        console.log(`  Collision with impactEnergy: ${collision.impactData.kineticEnergy.toExponential(2)}, totalMass: ${collision.impactData.totalMass.toExponential(2)}`);
+                        // console.log(`  Collision with impactEnergy: ${collision.impactData.kineticEnergy.toExponential(2)}, totalMass: ${collision.impactData.totalMass.toExponential(2)}`); // Removed per-collision log
                         indicesToRemove.add(collision.objects[0]);
                         indicesToRemove.add(collision.objects[1]);
                         fragmentsToAdd.push(...collision.fragments);
