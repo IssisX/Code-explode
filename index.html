@@ -537,37 +537,46 @@
                 // Secondary concentric fractures
                 stressWaves.forEach((wave, index) => {
                     // console.log(`[PF Engine] generateFractureLines wave ${index}: strength=${wave.strength.toExponential(2)}, radius=${wave.radius}`); // Removed per-wave log
-                    if (wave.strength > material.strength * 0.1) {
-                        if (!material.strength || material.strength === 0) { console.warn('Material strength is zero in generateFractureLines, skipping concentric fractures for this wave.'); return; }
-                        if (!isFinite(wave.strength) || wave.strength < 0) { console.warn('Invalid wave.strength, skipping concentric fractures.'); return; }
+                    if (wave.strength > material.strength * 0.1) { // Ensure material.strength is positive before this comparison
+                        if (!material.strength || material.strength <= 0) { console.warn(`Material strength is zero or negative (${material.strength}) in generateFractureLines, skipping concentric fractures for this wave.`); return; }
+                        if (!isFinite(wave.strength) || wave.strength < 0) { console.warn(`Invalid wave.strength (${wave.strength}), skipping concentric fractures.`); return; }
 
-                        let currentMaxConcentric = MAX_CONCENTRIC_FRACTURES_PER_WAVE; // Default cap (currently 10)
-                        if (wave.strength > material.strength * 50) { // If wave strength is very high
-                            currentMaxConcentric = Math.max(5, Math.floor(MAX_CONCENTRIC_FRACTURES_PER_WAVE / 2)); // Reduce cap significantly
-                            console.warn(`[PF Engine] High wave strength (${wave.strength.toExponential(2)}), reducing MAX_CONCENTRIC for this wave to ${currentMaxConcentric}`);
+                        const M_C_F_P_W = 10; // Using direct number to avoid potential corruption
+                        console.warn(`[PF Engine Debug] In generateFractureLines: M_C_F_P_W type=${typeof M_C_F_P_W}, value=${M_C_F_P_W}, material.strength=${material.strength ? material.strength.toExponential(2) : 'N/A'}`);
+
+                        let currentMaxConcentric = M_C_F_P_W;
+                        if (isFinite(wave.strength) && material.strength > 0 && wave.strength > material.strength * 50) {
+                            currentMaxConcentric = Math.max(5, Math.floor(M_C_F_P_W / 2));
+                            console.warn(`[PF Engine] High wave strength (${wave.strength.toExponential(2)} vs material strength ${material.strength.toExponential(2)}), reducing currentMaxConcentric for this wave to ${currentMaxConcentric}`);
+                        } else if (!isFinite(wave.strength) || !(material.strength > 0)) {
+                             console.warn(`[PF Engine] Non-finite wave.strength (${wave.strength}) or zero/neg material.strength (${material.strength}), using default currentMaxConcentric=${currentMaxConcentric}`);
                         }
 
-                        const numConcentric = Math.floor(wave.strength / material.strength * 6);
-                        const MAX_CONCENTRIC_FRACTURES_PER_WAVE = 10; // Base Sanity cap
-                        let effectiveNumConcentric = Math.min(numConcentric, currentMaxConcentric); // Apply potentially reduced cap
+                        const numConcentricCalc = Math.floor(wave.strength / material.strength * 6);
+                        let validatedNumConcentric = numConcentricCalc;
+                        if (!isFinite(numConcentricCalc) || numConcentricCalc < 0) {
+                            console.warn(`[PF Engine] numConcentric was non-finite or negative (${numConcentricCalc}), defaulting to currentMaxConcentric (${currentMaxConcentric})`);
+                            validatedNumConcentric = currentMaxConcentric;
+                        }
+
+                        let effectiveNumConcentric = Math.min(validatedNumConcentric, currentMaxConcentric);
                         if (!isFinite(effectiveNumConcentric) || effectiveNumConcentric < 0) effectiveNumConcentric = 0;
-
-                        // console.log(`[PF Engine] generateFractureLines: effectiveNumConcentric=${effectiveNumConcentric} for wave ${index}`); // Removed per-wave effectiveNumConcentric log
-
-                        const baseConcentricPoints = Math.floor(arcLength * radius * 0.1);
-                        const concentricPointDetailCap = (effectiveNumConcentric > (currentMaxConcentric * 0.75) ) ? Math.max(5, Math.floor(baseConcentricPoints * 0.5)) : baseConcentricPoints;
-
 
                         for (let i = 0; i < effectiveNumConcentric; i++) {
                             const startAngle = Math.random() * 2 * Math.PI;
-                            const arcLength = Math.PI * 0.3 + Math.random() * Math.PI * 0.4;
+                            const arcLength = Math.PI * 0.3 + Math.random() * Math.PI * 0.4; // arcLength is defined here
                             const radius = wave.radius * (0.8 + Math.random() * 0.4);
+
+                            // Moved concentricPointDetailCap calculation inside the loop
+                            const baseConcentricPoints = Math.floor(arcLength * radius * 0.1);
+                            const concentricPointDetailCap = (effectiveNumConcentric > (currentMaxConcentric * 0.75) ) ? Math.max(5, Math.floor(baseConcentricPoints * 0.5)) : baseConcentricPoints;
+                            const maxConcentricPoints = Math.max(1, concentricPointDetailCap); // Ensure at least 1 point
 
                             const concentric = this.generateConcentricFracture(
                                 impactPoint.x, impactPoint.y,
                                 radius, startAngle, arcLength,
                                 material.cohesion * 0.05,
-                                concentricPointDetailCap // Pass max points
+                                maxConcentricPoints // Pass max points
                             );
 
                             fractureLines.push({
@@ -609,11 +618,12 @@
 
             static generateConcentricFracture(centerX, centerY, radius, startAngle, arcLength, jaggedness, maxPoints) {
                 const points = [];
-                let numPoints = Math.floor(arcLength * radius * 0.1);
-                numPoints = Math.min(numPoints, maxPoints); // Apply maxPoints cap
+                let numPoints = Math.floor(arcLength * radius * 0.1); // Initial calculation
+                const finalNumPoints = Math.max(0, Math.min(numPoints, maxPoints)); // Ensure non-negative and capped
 
-                for (let i = 0; i <= numPoints; i++) {
-                    const angle = startAngle + (arcLength * i) / numPoints; // Will be NaN if numPoints is 0, but loop won't run
+                for (let i = 0; i <= finalNumPoints; i++) {
+                    // Avoid division by zero if finalNumPoints is 0 (though maxPoints is >=1, numPoints could be <0 initially)
+                    const angle = finalNumPoints === 0 ? startAngle : startAngle + (arcLength * i) / finalNumPoints;
                     const radiusVariation = radius * (1 + (Math.random() - 0.5) * jaggedness);
 
                     points.push({
